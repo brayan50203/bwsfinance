@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+
+{% block title %}Investimentos{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <h1 class="text-3xl font-bold mb-8">📈 Investimentos</h1>
+    
+    <div class="grid grid-cols-4 gap-4 mb-8">
+        <div class="bg-blue-500 text-white p-6 rounded-lg">
+            <p class="text-sm">Total Investido</p>
+            <p class="text-2xl font-bold" id="totalInvested">R$ 0,00</p>
+        </div>
+        <div class="bg-green-500 text-white p-6 rounded-lg">
+            <p class="text-sm">Valor Atual</p>
+            <p class="text-2xl font-bold" id="currentValue">R$ 0,00</p>
+        </div>
+        <div class="bg-purple-500 text-white p-6 rounded-lg">
+            <p class="text-sm">Rendimentos</p>
+            <p class="text-2xl font-bold" id="earnings">R$ 0,00</p>
+        </div>
+        <div class="bg-orange-500 text-white p-6 rounded-lg">
+            <p class="text-sm">Ativos</p>
+            <p class="text-2xl font-bold" id="activeCount">0</p>
+        </div>
+    </div>
+    
+    <div class="mb-4">
+        <button onclick="openModal()" class="bg-green-500 text-white px-6 py-2 rounded-lg">
+            ➕ Novo Investimento
+        </button>
+    </div>
+    
+    <div id="list" class="grid grid-cols-3 gap-4"></div>
+</div>
+
+<div id="modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 p-8 rounded-lg max-w-2xl w-full">
+        <h2 class="text-2xl font-bold mb-4 dark:text-white">Novo Investimento</h2>
+        <form id="form">
+            <input type="text" id="name" placeholder="Nome" class="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:text-white" required>
+            <select id="investment_type" class="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:text-white" required>
+                <option value="CDB">CDB</option>
+                <option value="LCI">LCI</option>
+                <option value="Tesouro Direto">Tesouro Direto</option>
+                <option value="Ações">Ações</option>
+            </select>
+            <input type="number" id="amount" placeholder="Valor" class="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:text-white" required>
+            <input type="number" id="interest_rate" placeholder="Taxa %" class="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:text-white" required>
+            <input type="date" id="start_date" class="w-full p-2 border rounded mb-4 dark:bg-gray-700 dark:text-white" required>
+            <div class="flex gap-4">
+                <button type="button" onclick="closeModal()" class="flex-1 bg-gray-300 dark:bg-gray-600 px-4 py-2 rounded dark:text-white">Cancelar</button>
+                <button type="submit" class="flex-1 bg-blue-500 text-white px-4 py-2 rounded">Criar</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let investments = [];
+
+async function loadInvestments() {
+    const res = await fetch('/api/investments');
+    const data = await res.json();
+    investments = data.investments || [];
+    updateUI();
+}
+
+function updateUI() {
+    const active = investments.filter(i => i.investment_status === 'active');
+    const total = active.reduce((s, i) => s + i.total_invested, 0);
+    const current = active.reduce((s, i) => s + (i.calculated_current_value || i.current_value), 0);
+    
+    document.getElementById('totalInvested').textContent = `R$ ${total.toFixed(2)}`;
+    document.getElementById('currentValue').textContent = `R$ ${current.toFixed(2)}`;
+    document.getElementById('earnings').textContent = `R$ ${(current - total).toFixed(2)}`;
+    document.getElementById('activeCount').textContent = active.length;
+    
+    const list = document.getElementById('list');
+    list.innerHTML = investments.map(inv => `
+        <div class="bg-white dark:bg-gray-800 p-4 rounded-lg shadow cursor-pointer" onclick="location.href='/investments/${inv.id}'">
+            <h3 class="font-bold dark:text-white">${inv.name}</h3>
+            <p class="dark:text-gray-300">${inv.investment_type}</p>
+            <p class="text-lg font-bold text-green-600">R$ ${(inv.calculated_current_value || inv.current_value).toFixed(2)}</p>
+        </div>
+    `).join('');
+}
+
+function openModal() {
+    document.getElementById('modal').classList.remove('hidden');
+    document.getElementById('start_date').valueAsDate = new Date();
+}
+
+function closeModal() {
+    document.getElementById('modal').classList.add('hidden');
+}
+
+document.getElementById('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const data = {
+        name: document.getElementById('name').value,
+        investment_type: document.getElementById('investment_type').value,
+        amount: parseFloat(document.getElementById('amount').value),
+        interest_rate: parseFloat(document.getElementById('interest_rate').value),
+        interest_type: 'compound',
+        start_date: document.getElementById('start_date').value
+    };
+    
+    const res = await fetch('/api/investments', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    });
+    
+    if (res.ok) {
+        closeModal();
+        loadInvestments();
+    }
+});
+
+loadInvestments();
+</script>
+{% endblock %}

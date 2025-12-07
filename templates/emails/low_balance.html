@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Saldo Baixo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .alert-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .balance-info {
+            background-color: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .balance-amount {
+            font-size: 48px;
+            font-weight: bold;
+            color: #f5576c;
+            margin: 10px 0;
+        }
+        .threshold {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚠️ Saldo Baixo</h1>
+        </div>
+        
+        <div class="content">
+            <p>Olá <strong>{{ first_name }}</strong>,</p>
+            
+            <div class="alert-box">
+                <strong>Alerta:</strong> Sua conta <strong>{{ account_name }}</strong> está com saldo abaixo do limite configurado.
+            </div>
+            
+            <div class="balance-info">
+                <div style="color: #6c757d; font-size: 14px;">SALDO ATUAL</div>
+                <div class="balance-amount">R$ {{ balance }}</div>
+                <div class="threshold">Limite configurado: R$ {{ threshold }}</div>
+            </div>
+            
+            <p style="margin: 20px 0;">
+                <strong>O que você pode fazer:</strong>
+            </p>
+            
+            <ul style="line-height: 1.8;">
+                <li>💸 Transferir fundos de outra conta</li>
+                <li>📊 Revisar seus gastos recentes</li>
+                <li>⚙️ Ajustar o limite de alerta nas configurações</li>
+            </ul>
+            
+            <div style="text-align: center;">
+                <a href="http://localhost:5000/accounts" class="cta-button">
+                    💰 Gerenciar Contas
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>BWS Finance - Seu assistente financeiro pessoal</p>
+            <p>Para gerenciar suas preferências de notificação, acesse: 
+                <a href="http://localhost:5000/settings/notifications">Configurações</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

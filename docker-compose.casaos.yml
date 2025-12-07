@@ -1,0 +1,175 @@
+version: '3.8'
+
+# ==================================================
+# BWS Finance - Docker Compose para CasaOS
+# ==================================================
+# Instalar no CasaOS:
+# 1. App Store → Custom Install
+# 2. Cole este arquivo
+# 3. Click Install
+# ==================================================
+
+name: bws-finance
+
+services:
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: bws-nginx
+    restart: unless-stopped
+    ports:
+      - "8080:80"  # CasaOS: Use porta 8080 para evitar conflito com porta 80
+    volumes:
+      - /DATA/AppData/bws-finance/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - /DATA/AppData/bws-finance/nginx/conf.d:/etc/nginx/conf.d:ro
+      - /DATA/AppData/bws-finance/nginx/logs:/var/log/nginx
+    networks:
+      - bws-network
+    depends_on:
+      - bws-backend
+      - whatsapp-server
+    labels:
+      icon: https://raw.githubusercontent.com/IceWhaleTech/CasaOS-AppStore/main/Apps/Nginx/icon.png
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # BWS Finance Backend (Flask + AI)
+  bws-backend:
+    image: python:3.11-slim
+    container_name: bws-finance-backend
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "
+      apt-get update && apt-get install -y gcc g++ curl &&
+      pip install --no-cache-dir -r requirements.txt &&
+      gunicorn app:app --bind 0.0.0.0:5000 --workers 2 --timeout 120 --access-logfile - --error-logfile -
+      "
+    expose:
+      - "5000"
+    volumes:
+      - /DATA/AppData/bws-finance:/app
+      - /DATA/AppData/bws-finance/bws_finance.db:/app/bws_finance.db
+      - /DATA/AppData/bws-finance/logs:/app/logs
+      - /DATA/AppData/bws-finance/temp:/app/temp
+      - /DATA/AppData/bws-finance/static/uploads:/app/static/uploads
+    environment:
+      # Flask
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5000
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production-123456}
+      
+      # WhatsApp
+      - WHATSAPP_SERVER_URL=http://whatsapp-server:3000
+      - WHATSAPP_AUTH_TOKEN=${WHATSAPP_AUTH_TOKEN:-bws_finance_token_55653}
+      - WHATSAPP_ENABLED=true
+      - WHATSAPP_SESSION_NAME=bws-finance
+      
+      # Email SMTP
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM:-noreply@bwsfinance.com}
+      
+      # Notificações
+      - AUTO_NOTIFICATIONS_ENABLED=${AUTO_NOTIFICATIONS_ENABLED:-true}
+      - NOTIFY_DEFAULT_LOW_BALANCE=${NOTIFY_DEFAULT_LOW_BALANCE:-100.00}
+      - NOTIFY_INVEST_PCT=${NOTIFY_INVEST_PCT:-3.0}
+      
+      # AI/ML
+      - WHISPER_MODEL=tiny
+      - WHISPER_LANGUAGE=pt
+      - TESSERACT_LANG=por
+      
+    networks:
+      - bws-network
+    labels:
+      icon: https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/flask.png
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # WhatsApp Server (Node.js + WPPConnect)
+  whatsapp-server:
+    image: node:22-alpine
+    container_name: bws-whatsapp-server
+    restart: unless-stopped
+    working_dir: /app
+    command: >
+      sh -c "
+      apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont python3 make g++ &&
+      npm install --production &&
+      node index_v3.js
+      "
+    expose:
+      - "3000"
+    volumes:
+      - /DATA/AppData/bws-finance/whatsapp_server:/app
+      - /DATA/AppData/bws-finance/whatsapp_server/tokens:/app/tokens
+    environment:
+      - PORT=3000
+      - FLASK_URL=http://bws-backend:5000
+      - WHATSAPP_AUTH_TOKEN=${WHATSAPP_AUTH_TOKEN:-bws_finance_token_55653}
+      - SESSION_NAME=bws-finance
+      - NODE_ENV=production
+    networks:
+      - bws-network
+    labels:
+      icon: https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/whatsapp.png
+    depends_on:
+      - bws-backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  bws-network:
+    driver: bridge
+
+# Metadata para CasaOS App Store
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+    - arm
+  main: nginx
+  description:
+    en_us: "BWS Finance - Personal Financial Management System with AI, WhatsApp integration, and advanced analytics"
+    pt_br: "BWS Finance - Sistema de Gestão Financeira Pessoal com IA, integração WhatsApp e análises avançadas"
+  tagline:
+    en_us: "Smart personal finance manager"
+    pt_br: "Gerenciador financeiro pessoal inteligente"
+  developer: "Brayan Barbosa Lima"
+  author: "BWS Team"
+  icon: https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/finance.png
+  thumbnail: https://raw.githubusercontent.com/walkxcode/dashboard-icons/main/png/finance.png
+  title:
+    en_us: "BWS Finance"
+  category: "Finance"
+  port_map: "8080"
+  tips:
+    before_install:
+      en_us: |
+        ### Installation Tips:
+        1. This app will be available at: http://YOUR_CASAOS_IP:8080
+        2. Default login will be created on first run
+        3. WhatsApp QR code will be shown in logs
+        4. Make sure port 8080 is not in use
+      pt_br: |
+        ### Dicas de Instalação:
+        1. Esta aplicação estará disponível em: http://IP_DO_CASAOS:8080
+        2. Login padrão será criado na primeira execução
+        3. QR code do WhatsApp aparecerá nos logs
+        4. Certifique-se que a porta 8080 não está em uso

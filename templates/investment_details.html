@@ -1,0 +1,834 @@
+{% extends "base.html" %}
+
+{% block title %}Detalhes do Investimento - BWS Finance{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Header -->
+    <div class="mb-8 flex justify-between items-center">
+        <div class="flex items-center gap-4">
+            <a href="/investments" class="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors">
+                <span class="text-2xl">← </span>
+            </a>
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+                    <span class="text-4xl" id="investmentIcon">📈</span>
+                    <span id="investmentName">Carregando...</span>
+                </h1>
+                <p class="text-gray-600 dark:text-gray-400 mt-1" id="investmentType"></p>
+            </div>
+        </div>
+        <div class="flex gap-3">
+            <button onclick="openDepositModal()" class="bg-green-600 text-white px-5 py-2.5 rounded-lg hover:bg-green-700 transition-all shadow-lg flex items-center gap-2">
+                <span class="text-lg">💵</span>
+                Aporte
+            </button>
+            <button onclick="openWithdrawModal()" class="bg-orange-600 text-white px-5 py-2.5 rounded-lg hover:bg-orange-700 transition-all shadow-lg flex items-center gap-2">
+                <span class="text-lg">💸</span>
+                Resgatar
+            </button>
+            <button onclick="calculateInterestNow()" class="bg-purple-600 text-white px-5 py-2.5 rounded-lg hover:bg-purple-700 transition-all shadow-lg flex items-center gap-2">
+                <span class="text-lg">🔄</span>
+                Calcular Juros
+            </button>
+        </div>
+    </div>
+
+    <!-- Cards de Resumo -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <!-- Valor Atual -->
+        <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-green-100 text-sm font-medium mb-1">Valor Atual</p>
+                    <p class="text-3xl font-bold" id="currentValue">R$ 0,00</p>
+                </div>
+                <div class="bg-white bg-opacity-20 rounded-full p-4">
+                    <span class="text-4xl">💰</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Total Investido -->
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-blue-100 text-sm font-medium mb-1">Total Investido</p>
+                    <p class="text-3xl font-bold" id="totalInvested">R$ 0,00</p>
+                </div>
+                <div class="bg-white bg-opacity-20 rounded-full p-4">
+                    <span class="text-4xl">📊</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rendimento -->
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-purple-100 text-sm font-medium mb-1">Rendimento</p>
+                    <p class="text-3xl font-bold" id="totalEarned">R$ 0,00</p>
+                    <p class="text-sm text-purple-100 mt-1" id="returnPercent">0%</p>
+                </div>
+                <div class="bg-white bg-opacity-20 rounded-full p-4">
+                    <span class="text-4xl">💸</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Taxa de Juros -->
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-orange-100 text-sm font-medium mb-1">Taxa de Juros</p>
+                    <p class="text-3xl font-bold" id="interestRate">0%</p>
+                    <p class="text-sm text-orange-100 mt-1" id="interestTypeLabel">ao ano</p>
+                </div>
+                <div class="bg-white bg-opacity-20 rounded-full p-4">
+                    <span class="text-4xl">📈</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Coluna Principal (2/3) -->
+        <div class="lg:col-span-2 space-y-6">
+            <!-- Gráfico de Crescimento -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <span>📊</span>
+                    Evolução do Investimento
+                </h3>
+                <canvas id="growthChart" height="80"></canvas>
+            </div>
+
+            <!-- Histórico de Operações -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <span>📋</span>
+                    Histórico de Operações
+                </h3>
+                
+                <div id="historyList" class="space-y-3">
+                    <!-- Histórico será carregado via JavaScript -->
+                </div>
+
+                <div id="emptyHistory" class="hidden text-center py-8">
+                    <span class="text-6xl">📭</span>
+                    <p class="text-gray-600 dark:text-gray-400 mt-3">
+                        Nenhuma operação registrada ainda
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Coluna Lateral (1/3) -->
+        <div class="space-y-6">
+            <!-- Informações do Investimento -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <span>ℹ️</span>
+                    Informações
+                </h3>
+                
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                        <span class="text-gray-600 dark:text-gray-400">Status:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white" id="investmentStatus">-</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                        <span class="text-gray-600 dark:text-gray-400">Data de Início:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white" id="startDate">-</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                        <span class="text-gray-600 dark:text-gray-400">Vencimento:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white" id="maturityDate">-</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                        <span class="text-gray-600 dark:text-gray-400">Dias Investidos:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white" id="daysInvested">-</span>
+                    </div>
+                    <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                        <span class="text-gray-600 dark:text-gray-400">Tipo de Juros:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white" id="interestTypeInfo">-</span>
+                    </div>
+                    <div class="flex justify-between py-2">
+                        <span class="text-gray-600 dark:text-gray-400">Operações:</span>
+                        <span class="font-semibold text-gray-900 dark:text-white" id="operationsCount">-</span>
+                    </div>
+                </div>
+
+                <div id="descriptionSection" class="mt-6 pt-6 border-t dark:border-gray-700 hidden">
+                    <p class="text-sm text-gray-600 dark:text-gray-400 font-medium mb-2">Descrição:</p>
+                    <p class="text-sm text-gray-900 dark:text-white" id="investmentDescription">-</p>
+                </div>
+            </div>
+
+            <!-- Ações Rápidas -->
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
+                <h3 class="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                    <span>⚡</span>
+                    Ações Rápidas
+                </h3>
+                
+                <div class="space-y-3">
+                    <button onclick="openEditModal()" class="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+                        <span>✏️</span>
+                        Editar Investimento
+                    </button>
+                    
+                    <button onclick="exportHistory()" class="w-full px-4 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center justify-center gap-2">
+                        <span>📥</span>
+                        Exportar Histórico
+                    </button>
+                    
+                    <button onclick="cancelInvestment()" class="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all flex items-center justify-center gap-2">
+                        <span>❌</span>
+                        Cancelar Investimento
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal de Aporte -->
+<div id="depositModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full">
+        <div class="bg-gradient-to-r from-green-500 to-emerald-600 text-white p-6 rounded-t-2xl">
+            <h2 class="text-2xl font-bold flex items-center gap-2">
+                <span>💵</span>
+                Fazer Aporte
+            </h2>
+        </div>
+        
+        <form id="depositForm" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Valor do Aporte *
+                </label>
+                <input type="number" id="depositAmount" required step="0.01" min="0.01"
+                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="0.00">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Data
+                </label>
+                <input type="date" id="depositDate"
+                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Descrição (Opcional)
+                </label>
+                <textarea id="depositDescription" rows="2"
+                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-green-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Ex: Aporte mensal"></textarea>
+            </div>
+
+            <div class="flex gap-3 pt-4 border-t dark:border-gray-700">
+                <button type="button" onclick="closeDepositModal()" 
+                    class="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all">
+                    Cancelar
+                </button>
+                <button type="submit"
+                    class="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all shadow-lg">
+                    Confirmar Aporte
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal de Resgate -->
+<div id="withdrawModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl max-w-md w-full">
+        <div class="bg-gradient-to-r from-orange-500 to-orange-600 text-white p-6 rounded-t-2xl">
+            <h2 class="text-2xl font-bold flex items-center gap-2">
+                <span>💸</span>
+                Resgatar Investimento
+            </h2>
+        </div>
+        
+        <form id="withdrawForm" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Valor do Resgate *
+                </label>
+                <input type="number" id="withdrawAmount" required step="0.01" min="0.01"
+                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="0.00">
+                <p class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                    Máximo disponível: <span id="maxWithdraw" class="font-semibold">R$ 0,00</span>
+                </p>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Data
+                </label>
+                <input type="date" id="withdrawDate"
+                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Descrição (Opcional)
+                </label>
+                <textarea id="withdrawDescription" rows="2"
+                    class="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
+                    placeholder="Ex: Resgate emergencial"></textarea>
+            </div>
+
+            <div class="flex gap-3 pt-4 border-t dark:border-gray-700">
+                <button type="button" onclick="closeWithdrawModal()" 
+                    class="flex-1 px-4 py-3 border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all">
+                    Cancelar
+                </button>
+                <button type="submit"
+                    class="flex-1 px-4 py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-all shadow-lg">
+                    Confirmar Resgate
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Chart.js - Carregado antes dos scripts -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+<script>
+const investmentId = {{ investment_id }};
+let investment = null;
+let history = [];
+let growthChart = null;
+
+// Cores por tipo
+const typeColors = {
+    'CDB': { bg: 'from-blue-500 to-blue-600', icon: '🏦' },
+    'LCI': { bg: 'from-green-500 to-green-600', icon: '🏡' },
+    'LCA': { bg: 'from-yellow-500 to-yellow-600', icon: '🌾' },
+    'Tesouro Direto': { bg: 'from-purple-500 to-purple-600', icon: '🏛️' },
+    'Ações': { bg: 'from-red-500 to-red-600', icon: '📈' },
+    'Fundos': { bg: 'from-indigo-500 to-indigo-600', icon: '💼' },
+    'Poupança': { bg: 'from-teal-500 to-teal-600', icon: '🐷' },
+    'Outro': { bg: 'from-gray-500 to-gray-600', icon: '💰' }
+};
+
+const statusLabels = {
+    'active': 'Ativo ✅',
+    'matured': 'Vencido ⏰',
+    'withdrawn': 'Resgatado 💸',
+    'cancelled': 'Cancelado ❌'
+};
+
+const operationLabels = {
+    'deposit': { label: 'Aporte', icon: '💵', color: 'text-blue-600' },
+    'withdrawal': { label: 'Resgate', icon: '💸', color: 'text-orange-600' },
+    'interest': { label: 'Juros', icon: '💰', color: 'text-green-600' },
+    'adjustment': { label: 'Ajuste', icon: '⚙️', color: 'text-gray-600' }
+};
+
+// Carregar dados
+async function loadInvestment() {
+    try {
+        const response = await fetch(`/api/investments/${investmentId}`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            investment = data;
+            updateUI();
+            loadHistory();
+        } else {
+            alert('Erro ao carregar investimento: ' + data.error);
+            window.location.href = '/investments';
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro ao carregar investimento');
+    }
+}
+
+async function loadHistory() {
+    try {
+        const response = await fetch(`/api/investments/${investmentId}/history`);
+        const data = await response.json();
+        
+        if (response.ok) {
+            history = data.history || [];
+            renderHistory();
+            updateGrowthChart();
+        }
+    } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+    }
+}
+
+function updateUI() {
+    const currentValue = investment.calculated_current_value || investment.current_value || 0;
+    const earned = investment.calculated_earned || investment.total_earned || 0;
+    const returnPercent = investment.total_invested > 0 ? ((earned / investment.total_invested) * 100).toFixed(2) : 0;
+    
+    // Header
+    const typeInfo = typeColors[investment.investment_type] || typeColors['Outro'];
+    document.getElementById('investmentIcon').textContent = typeInfo.icon;
+    document.getElementById('investmentName').textContent = investment.name;
+    document.getElementById('investmentType').textContent = investment.investment_type;
+    
+    // Cards
+    document.getElementById('currentValue').textContent = formatCurrency(currentValue);
+    document.getElementById('totalInvested').textContent = formatCurrency(investment.total_invested);
+    document.getElementById('totalEarned').textContent = formatCurrency(earned);
+    document.getElementById('returnPercent').textContent = `${returnPercent}% de retorno`;
+    document.getElementById('interestRate').textContent = `${investment.interest_rate}%`;
+    document.getElementById('interestTypeLabel').textContent = investment.interest_type === 'compound' ? 'compostos a.a.' : 'simples a.a.';
+    
+    // Informações
+    document.getElementById('investmentStatus').textContent = statusLabels[investment.investment_status] || investment.investment_status;
+    document.getElementById('startDate').textContent = formatDate(investment.start_date);
+    document.getElementById('maturityDate').textContent = investment.maturity_date ? formatDate(investment.maturity_date) : 'Sem vencimento';
+    document.getElementById('daysInvested').textContent = investment.duration_days || calculateDays(investment.start_date);
+    document.getElementById('interestTypeInfo').textContent = investment.interest_type === 'compound' ? 'Juros Compostos' : 'Juros Simples';
+    document.getElementById('operationsCount').textContent = investment.history_count || 0;
+    
+    // Descrição
+    if (investment.description) {
+        document.getElementById('descriptionSection').classList.remove('hidden');
+        document.getElementById('investmentDescription').textContent = investment.description;
+    }
+    
+    // Max withdraw
+    document.getElementById('maxWithdraw').textContent = formatCurrency(currentValue);
+}
+
+function renderHistory() {
+    const historyList = document.getElementById('historyList');
+    const emptyHistory = document.getElementById('emptyHistory');
+    
+    if (history.length === 0) {
+        historyList.innerHTML = '';
+        emptyHistory.classList.remove('hidden');
+        return;
+    }
+    
+    emptyHistory.classList.add('hidden');
+    
+    historyList.innerHTML = history.map(op => {
+        const opInfo = operationLabels[op.operation_type] || { label: op.operation_type, icon: '📄', color: 'text-gray-600' };
+        const isPositive = op.operation_type === 'deposit' || op.operation_type === 'interest';
+        
+        return `
+            <div class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-600 transition-colors">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">${opInfo.icon}</span>
+                    <div>
+                        <p class="font-semibold text-gray-900 dark:text-white">${opInfo.label}</p>
+                        <p class="text-xs text-gray-600 dark:text-gray-400">${formatDate(op.date)}</p>
+                        ${op.description ? `<p class="text-xs text-gray-500 dark:text-gray-500 mt-1">${op.description}</p>` : ''}
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="font-bold ${isPositive ? 'text-green-600' : 'text-orange-600'}">
+                        ${isPositive ? '+' : '-'} ${formatCurrency(Math.abs(op.amount))}
+                    </p>
+                    <p class="text-xs text-gray-600 dark:text-gray-400">
+                        Saldo: ${formatCurrency(op.balance_after)}
+                    </p>
+                    ${op.interest_earned > 0 ? `<p class="text-xs text-green-600">Juros: ${formatCurrency(op.interest_earned)}</p>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function updateGrowthChart() {
+    const ctx = document.getElementById('growthChart');
+    
+    // Preparar dados para o gráfico
+    const sortedHistory = [...history].sort((a, b) => new Date(a.date) - new Date(b.date));
+    const labels = sortedHistory.map(op => formatDate(op.date));
+    const balances = sortedHistory.map(op => op.balance_after);
+    const invested = sortedHistory.map((op, idx) => {
+        // Calcular total investido até esse ponto
+        return sortedHistory.slice(0, idx + 1)
+            .filter(h => h.operation_type === 'deposit')
+            .reduce((sum, h) => sum + h.amount, 0);
+    });
+    
+    if (growthChart) {
+        growthChart.destroy();
+    }
+    
+    growthChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Valor Atual',
+                    data: balances,
+                    borderColor: '#10B981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                },
+                {
+                    label: 'Total Investido',
+                    data: invested,
+                    borderColor: '#3B82F6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.dataset.label}: ${formatCurrency(context.parsed.y)}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        callback: function(value) {
+                            return formatCurrency(value);
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+// Modals
+function openDepositModal() {
+    document.getElementById('depositModal').classList.remove('hidden');
+    document.getElementById('depositDate').valueAsDate = new Date();
+}
+
+function closeDepositModal() {
+    document.getElementById('depositModal').classList.add('hidden');
+}
+
+function openWithdrawModal() {
+    document.getElementById('withdrawModal').classList.remove('hidden');
+    document.getElementById('withdrawDate').valueAsDate = new Date();
+}
+
+function closeWithdrawModal() {
+    document.getElementById('withdrawModal').classList.add('hidden');
+}
+
+// Ações
+document.getElementById('depositForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        amount: parseFloat(document.getElementById('depositAmount').value),
+        date: document.getElementById('depositDate').value,
+        description: document.getElementById('depositDescription').value
+    };
+    
+    try {
+        const response = await fetch(`/api/investments/${investmentId}/deposit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            closeDepositModal();
+            alert('✅ Aporte realizado com sucesso!');
+            loadInvestment();
+        } else {
+            alert('❌ Erro: ' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Erro ao fazer aporte');
+        console.error(error);
+    }
+});
+
+document.getElementById('withdrawForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        amount: parseFloat(document.getElementById('withdrawAmount').value),
+        date: document.getElementById('withdrawDate').value,
+        description: document.getElementById('withdrawDescription').value
+    };
+    
+    try {
+        const response = await fetch(`/api/investments/${investmentId}/withdraw`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            closeWithdrawModal();
+            alert('✅ Resgate realizado com sucesso!');
+            loadInvestment();
+        } else {
+            alert('❌ Erro: ' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Erro ao fazer resgate');
+        console.error(error);
+    }
+});
+
+async function calculateInterestNow() {
+    if (!confirm('Calcular e aplicar os juros acumulados até agora?')) return;
+    
+    try {
+        const response = await fetch(`/api/investments/${investmentId}/calculate-interest`, {
+            method: 'POST'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert(`✅ Juros calculados! Rendimento: ${formatCurrency(result.interest_earned)} em ${result.days} dias`);
+            loadInvestment();
+        } else {
+            alert('❌ Erro: ' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Erro ao calcular juros');
+        console.error(error);
+    }
+}
+
+async function cancelInvestment() {
+    if (!confirm('⚠️ Tem certeza que deseja CANCELAR este investimento? Esta ação não pode ser desfeita!')) return;
+    
+    try {
+        const response = await fetch(`/api/investments/${investmentId}`, {
+            method: 'DELETE'
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('✅ Investimento cancelado');
+            window.location.href = '/investments';
+        } else {
+            alert('❌ Erro: ' + result.error);
+        }
+    } catch (error) {
+        alert('❌ Erro ao cancelar investimento');
+        console.error(error);
+    }
+}
+
+function openEditModal() {
+    if (!investment) {
+        alert('❌ Dados do investimento não carregados');
+        return;
+    }
+    
+    // Calcular preço médio e quantidade
+    const quantity = investment.quantity || 1;
+    const avgPrice = quantity > 0 ? investment.amount / quantity : investment.amount;
+    
+    // Criar e mostrar modal de edição
+    const modal = document.createElement('div');
+    modal.id = 'quickEditModal';
+    modal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4';
+    modal.innerHTML = `
+        <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden">
+            <div class="bg-gradient-to-r from-green-600 to-teal-600 px-6 py-5 flex justify-between items-center">
+                <h3 class="text-2xl font-bold text-white">✏️ Editar Investimento</h3>
+                <button onclick="closeQuickEditModal()" class="text-white hover:text-gray-200 transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            
+            <form id="quickEditForm" class="p-6">
+                <div class="space-y-5">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Tipo de ativo</label>
+                            <select id="editType" required class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500">
+                                <option value="Ações" ${investment.investment_type === 'Ações' ? 'selected' : ''}>📊 Ações</option>
+                                <option value="CDB" ${investment.investment_type === 'CDB' ? 'selected' : ''}>🏦 CDB</option>
+                                <option value="LCI" ${investment.investment_type === 'LCI' ? 'selected' : ''}>🏠 LCI</option>
+                                <option value="LCA" ${investment.investment_type === 'LCA' ? 'selected' : ''}>🌾 LCA</option>
+                                <option value="Tesouro Direto" ${investment.investment_type === 'Tesouro Direto' ? 'selected' : ''}>🏛️ Tesouro Direto</option>
+                                <option value="Fundos" ${investment.investment_type === 'Fundos' ? 'selected' : ''}>📈 Fundos</option>
+                                <option value="Poupança" ${investment.investment_type === 'Poupança' ? 'selected' : ''}>💰 Poupança</option>
+                                <option value="Outro" ${investment.investment_type === 'Outro' ? 'selected' : ''}>💼 Outro</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Ativo</label>
+                            <input type="text" id="editName" required value="${investment.name}" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500">
+                        </div>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Quantidade</label>
+                            <input type="number" id="editQty" required step="0.01" min="0" value="${quantity}" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500" oninput="updateEditTotal()">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Preço Médio (R$)</label>
+                            <input type="number" id="editAvgPrice" required step="0.01" min="0" value="${avgPrice.toFixed(2)}" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500" oninput="updateEditTotal()">
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Valor Total Investido (R$)</label>
+                        <input type="number" id="editTotalCalc" readonly value="${investment.amount.toFixed(2)}" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Observações</label>
+                        <textarea id="editDesc" rows="3" class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500 resize-none">${investment.description || ''}</textarea>
+                    </div>
+                </div>
+                
+                <div class="flex gap-3 mt-6">
+                    <button type="button" onclick="closeQuickEditModal()" class="flex-1 py-3 rounded-xl font-semibold border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition">Cancelar</button>
+                    <button type="submit" class="flex-1 py-3 rounded-xl font-semibold bg-green-600 text-white hover:bg-green-700 transition shadow-lg"><span class="mr-2">💾</span> Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Handler do formulário
+    document.getElementById('quickEditForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const qty = parseFloat(document.getElementById('editQty').value);
+        const avgPrice = parseFloat(document.getElementById('editAvgPrice').value);
+        
+        const data = {
+            name: document.getElementById('editName').value,
+            investment_type: document.getElementById('editType').value,
+            quantity: qty,
+            amount: qty * avgPrice,
+            description: document.getElementById('editDesc').value
+        };
+        
+        try {
+            const response = await fetch(`/investments/edit/${investmentId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            
+            const result = await response.json();
+            
+            if (response.ok) {
+                alert('✅ Investimento atualizado com sucesso!');
+                closeQuickEditModal();
+                loadInvestment(); // Recarregar dados
+            } else {
+                alert('❌ Erro ao atualizar: ' + (result.error || 'Falha desconhecida'));
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            alert('❌ Erro ao conectar com o servidor: ' + error.message);
+        }
+    });
+}
+
+function closeQuickEditModal() {
+    const modal = document.getElementById('quickEditModal');
+    if (modal) {
+        modal.remove();
+    }
+}
+
+function updateEditTotal() {
+    const qty = parseFloat(document.getElementById('editQty')?.value) || 0;
+    const avgPrice = parseFloat(document.getElementById('editAvgPrice')?.value) || 0;
+    const total = qty * avgPrice;
+    const totalField = document.getElementById('editTotalCalc');
+    if (totalField) {
+        totalField.value = total.toFixed(2);
+    }
+}
+
+function exportHistory() {
+    // Criar CSV do histórico
+    let csv = 'Data,Operação,Valor,Saldo Anterior,Saldo Posterior,Juros,Descrição\n';
+    
+    history.forEach(op => {
+        const opInfo = operationLabels[op.operation_type] || { label: op.operation_type };
+        csv += `${op.date},${opInfo.label},${op.amount},${op.balance_before},${op.balance_after},${op.interest_earned || 0},"${op.description || ''}"\n`;
+    });
+    
+    // Download
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `historico-investimento-${investment.name.replace(/\s+/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+}
+
+// Utilitários
+function formatCurrency(value) {
+    return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    }).format(value);
+}
+
+function formatDate(dateString) {
+    if (!dateString) return '-';
+    return new Date(dateString + 'T00:00:00').toLocaleDateString('pt-BR');
+}
+
+function calculateDays(startDate) {
+    const start = new Date(startDate);
+    const today = new Date();
+    return Math.floor((today - start) / (1000 * 60 * 60 * 24));
+}
+
+// Fechar modals ao clicar fora
+document.getElementById('depositModal').addEventListener('click', (e) => {
+    if (e.target.id === 'depositModal') closeDepositModal();
+});
+
+document.getElementById('withdrawModal').addEventListener('click', (e) => {
+    if (e.target.id === 'withdrawModal') closeWithdrawModal();
+});
+
+// Carregar ao iniciar
+document.addEventListener('DOMContentLoaded', () => {
+    loadInvestment();
+});
+</script>
+
+{% endblock %}

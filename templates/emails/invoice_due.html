@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fatura Vencendo</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+        }
+        .content {
+            padding: 30px;
+        }
+        .alert-box {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .alert-box.urgent {
+            background-color: #f8d7da;
+            border-left-color: #dc3545;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .info-row:last-child {
+            border-bottom: none;
+        }
+        .info-label {
+            font-weight: 600;
+            color: #495057;
+        }
+        .info-value {
+            color: #212529;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 30px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: 600;
+            text-align: center;
+        }
+        .cta-button:hover {
+            opacity: 0.9;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            font-size: 12px;
+            color: #6c757d;
+        }
+        .emoji {
+            font-size: 24px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚨 Fatura Vencendo</h1>
+        </div>
+        
+        <div class="content">
+            <p>Olá <strong>{{ first_name }}</strong>,</p>
+            
+            {% if days == 0 %}
+            <div class="alert-box urgent">
+                <span class="emoji">⚠️</span>
+                <strong>ATENÇÃO:</strong> Sua fatura vence <strong>HOJE</strong>!
+            </div>
+            {% else %}
+            <div class="alert-box">
+                <span class="emoji">🔔</span>
+                <strong>Lembrete:</strong> Sua fatura vence em <strong>{{ days }} dias</strong>.
+            </div>
+            {% endif %}
+            
+            <p>Detalhes da fatura:</p>
+            
+            <div class="info-row">
+                <span class="info-label">💳 Cartão:</span>
+                <span class="info-value">{{ card_name }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">💰 Valor:</span>
+                <span class="info-value">R$ {{ amount }}</span>
+            </div>
+            
+            <div class="info-row">
+                <span class="info-label">📅 Vencimento:</span>
+                <span class="info-value">{{ due_date }}</span>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="http://localhost:5000/dashboard/invoices" class="cta-button">
+                    📋 Abrir no Painel
+                </a>
+            </div>
+            
+            <p style="margin-top: 20px; color: #6c757d; font-size: 14px;">
+                💡 <strong>Dica:</strong> Pague sua fatura antes do vencimento para evitar juros e manter seu score de crédito!
+            </p>
+        </div>
+        
+        <div class="footer">
+            <p>BWS Finance - Seu assistente financeiro pessoal</p>
+            <p>Para gerenciar suas preferências de notificação, acesse: 
+                <a href="http://localhost:5000/settings/notifications">Configurações</a>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

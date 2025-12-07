@@ -1,0 +1,22 @@
+@app.route('/accounts')
+@login_required
+def accounts():
+    """Lista todas as contas"""
+    user = get_current_user()
+    db = get_db()
+
+    accounts = db.execute("""
+        SELECT * FROM v_account_balances
+        WHERE user_id = ? AND tenant_id = ?
+        ORDER BY name ASC
+    """, (user['id'], user['tenant_id'])).fetchall()
+
+    # Calcular saldo total de todas as contas
+    total_balance = sum(float(a['balance']) if a['balance'] else 0 for a in accounts)
+
+    db.close()
+    
+    return render_template('accounts.html',
+                         user=user,
+                         accounts=[dict(a) for a in accounts],
+                         total_balance=total_balance)

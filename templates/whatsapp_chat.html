@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat WhatsApp - BWS Finance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-2xl mx-auto bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-2xl font-bold mb-4 text-blue-600">💬 Chat WhatsApp IA</h1>
+            <p class="text-gray-600 mb-6">Converse com o assistente financeiro (versão web enquanto o WhatsApp automático está sendo corrigido)</p>
+            
+            <div id="chat-messages" class="space-y-4 mb-4 h-96 overflow-y-auto border border-gray-200 rounded-lg p-4">
+                <div class="text-center text-gray-400 text-sm">
+                    Envie uma mensagem para começar!
+                </div>
+            </div>
+            
+            <div class="flex gap-2">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    placeholder="Digite sua mensagem..." 
+                    class="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:border-blue-500"
+                    onkeypress="if(event.key==='Enter') sendMessage()"
+                />
+                <button 
+                    onclick="sendMessage()" 
+                    class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-semibold"
+                >
+                    Enviar
+                </button>
+            </div>
+            
+            <div class="mt-4 text-sm text-gray-500">
+                <p><strong>Exemplos:</strong></p>
+                <ul class="list-disc list-inside">
+                    <li>"Quanto gastei este mês?"</li>
+                    <li>"Gastei 50 reais no supermercado"</li>
+                    <li>"Meus investimentos"</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function addMessage(text, isUser) {
+            const messagesDiv = document.getElementById('chat-messages');
+            
+            // Limpar mensagem inicial
+            if (messagesDiv.children.length === 1 && messagesDiv.children[0].classList.contains('text-center')) {
+                messagesDiv.innerHTML = '';
+            }
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
+            
+            const bubble = document.createElement('div');
+            bubble.className = `max-w-xs md:max-w-md px-4 py-2 rounded-lg ${
+                isUser 
+                    ? 'bg-blue-600 text-white' 
+                    : 'bg-gray-200 text-gray-800'
+            }`;
+            bubble.style.whiteSpace = 'pre-wrap';
+            bubble.textContent = text;
+            
+            messageDiv.appendChild(bubble);
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        async function sendMessage() {
+            const input = document.getElementById('message-input');
+            const message = input.value.trim();
+            
+            if (!message) return;
+            
+            // Adicionar mensagem do usuário
+            addMessage(message, true);
+            input.value = '';
+            
+            // Mostrar "digitando..."
+            addMessage('Digitando...', false);
+            
+            try {
+                const response = await fetch('/api/whatsapp/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message })
+                });
+                
+                const data = await response.json();
+                
+                // Remover "digitando..."
+                const messagesDiv = document.getElementById('chat-messages');
+                messagesDiv.removeChild(messagesDiv.lastChild);
+                
+                if (data.success) {
+                    addMessage(data.response, false);
+                } else {
+                    addMessage('❌ Erro: ' + data.message, false);
+                }
+            } catch (error) {
+                // Remover "digitando..."
+                const messagesDiv = document.getElementById('chat-messages');
+                messagesDiv.removeChild(messagesDiv.lastChild);
+                
+                addMessage('❌ Erro de conexão. Faça login em http://localhost:5000', false);
+            }
+        }
+    </script>
+</body>
+</html>

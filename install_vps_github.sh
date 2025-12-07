@@ -1,0 +1,194 @@
+#!/bin/bash
+# ========================================
+# 🚀 INSTALAÇÃO VIA GITHUB (SEM UPLOAD MANUAL)
+# ========================================
+# Cole este script inteiro na VPS
+# ========================================
+
+set -e
+
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║                                                            ║"
+echo "║        🚀 NIK0 FINANCE - INSTALAÇÃO VIA GITHUB           ║"
+echo "║                                                            ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+
+# ⚠️ CONFIGURE AQUI SEU REPOSITÓRIO GITHUB
+GITHUB_REPO="https://github.com/SEU_USUARIO/nik0finance.git"  # ⬅️ ALTERE AQUI!
+
+echo "📦 Atualizando sistema..."
+apt update -y && apt upgrade -y
+
+echo "🐍 Instalando Python 3.11..."
+apt install -y software-properties-common
+add-apt-repository -y ppa:deadsnakes/ppa
+apt update -y
+apt install -y python3.11 python3.11-venv python3.11-dev python3-pip
+update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+
+echo "📗 Instalando Node.js 22..."
+curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+apt install -y nodejs
+
+echo "🔧 Instalando dependências..."
+apt install -y tesseract-ocr tesseract-ocr-por ffmpeg git curl wget nano htop nginx certbot python3-certbot-nginx
+
+echo "📥 Clonando projeto do GitHub..."
+mkdir -p /app
+cd /app
+rm -rf nik0finance  # Remove se já existir
+git clone $GITHUB_REPO nik0finance
+cd /app/nik0finance
+
+echo "📦 Instalando dependências Python..."
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+
+# Criar requirements.txt se não existir
+if [ ! -f "requirements.txt" ]; then
+    cat > requirements.txt << 'EOF'
+Flask==2.3.2
+ofxparse==0.21
+PyPDF2==3.0.1
+pytesseract==0.3.10
+python-dateutil==2.8.2
+requests==2.31.0
+schedule==1.2.0
+openai==1.3.5
+EOF
+fi
+
+pip install -r requirements.txt
+
+# Instalar dependências WhatsApp
+if [ -d "whatsapp_server" ]; then
+    echo "📦 Instalando dependências WhatsApp..."
+    cd whatsapp_server
+    npm install
+    cd ..
+fi
+
+# Criar banco de dados vazio se não existir
+if [ ! -f "bws_finance.db" ]; then
+    echo "💾 Criando banco de dados..."
+    python3 << 'PYTHON_EOF'
+import sqlite3
+conn = sqlite3.connect('bws_finance.db')
+cursor = conn.cursor()
+# Criar tabelas básicas (você pode adicionar mais)
+cursor.execute('''CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    name TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+)''')
+conn.commit()
+conn.close()
+print("✅ Banco de dados criado!")
+PYTHON_EOF
+fi
+
+echo "🌐 Configurando Nginx..."
+cat > /etc/nginx/sites-available/nik0finance << 'NGINX_EOF'
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+    client_max_body_size 50M;
+
+    location / {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+    }
+
+    location /static/ {
+        alias /app/nik0finance/static/;
+        expires 30d;
+    }
+}
+NGINX_EOF
+
+rm -f /etc/nginx/sites-enabled/default
+ln -sf /etc/nginx/sites-available/nik0finance /etc/nginx/sites-enabled/
+nginx -t && systemctl restart nginx
+
+echo "⚙️ Criando serviços systemd..."
+cat > /etc/systemd/system/nik0finance.service << 'SERVICE_EOF'
+[Unit]
+Description=Nik0 Finance Flask App
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/app/nik0finance
+Environment="PATH=/app/nik0finance/venv/bin"
+ExecStart=/app/nik0finance/venv/bin/python app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
+if [ -d "/app/nik0finance/whatsapp_server" ]; then
+    cat > /etc/systemd/system/nik0finance-whatsapp.service << 'WA_EOF'
+[Unit]
+Description=Nik0 Finance WhatsApp
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/app/nik0finance/whatsapp_server
+ExecStart=/usr/bin/node index_v3.js
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+WA_EOF
+fi
+
+systemctl daemon-reload
+systemctl enable nik0finance
+systemctl start nik0finance
+
+if [ -d "/app/nik0finance/whatsapp_server" ]; then
+    systemctl enable nik0finance-whatsapp
+    systemctl start nik0finance-whatsapp
+fi
+
+sleep 3
+clear
+
+echo ""
+echo "╔════════════════════════════════════════════════════════════╗"
+echo "║                                                            ║"
+echo "║              ✅ INSTALAÇÃO CONCLUÍDA!                     ║"
+echo "║                                                            ║"
+echo "╚════════════════════════════════════════════════════════════╝"
+echo ""
+echo "🌐 Acesse: http://$(curl -s ifconfig.me)"
+echo ""
+echo "📊 Status:"
+systemctl is-active nik0finance && echo "  ✅ Flask: Rodando" || echo "  ❌ Flask: Parado"
+echo ""
+echo "🔧 Comandos:"
+echo "  Ver logs:      journalctl -u nik0finance -f"
+echo "  Reiniciar:     systemctl restart nik0finance"
+echo "  Atualizar:     cd /app/nik0finance && git pull && systemctl restart nik0finance"
+echo ""
+echo "📱 Configure app mobile:"
+echo "  const API_BASE_URL = 'http://$(curl -s ifconfig.me)';"
+echo ""

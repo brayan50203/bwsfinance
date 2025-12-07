@@ -1,0 +1,40 @@
+# ========================================
+# Dependências para WhatsApp 100% Local
+# ========================================
+
+# Core Framework
+Flask==3.0.0
+Flask-CORS==4.0.0
+Werkzeug==3.0.1
+
+# Banco de Dados
+# sqlite3 (já incluído no Python)
+
+# WhatsApp/IA - Processamento LOCAL
+openai-whisper==20231117  # Transcrição de áudio (LOCAL)
+pytesseract==0.3.10       # OCR de imagens (LOCAL)
+spacy==3.7.2              # NLP português (LOCAL)
+python-dateutil==2.8.2    # Parsing de datas
+
+# Processamento de Mídia
+Pillow==10.1.0            # Imagens
+PyPDF2==3.0.1             # PDFs
+pydub==0.25.1             # Áudio
+
+# Utilidades
+requests==2.31.0          # HTTP (apenas para download inicial de modelos)
+python-dotenv==1.0.0      # Variáveis de ambiente
+
+# Opcional: APIs Externas (pode remover se 100% offline)
+# brapi-python==2.0.0     # Cotações brasileiras (ONLINE)
+# yfinance==0.2.31        # Cotações internacionais (ONLINE)
+
+# ========================================
+# Instalação:
+# pip install -r requirements-local.txt
+# ========================================
+
+# ========================================
+# Após instalar, baixar modelos locais:
+# python -m spacy download pt_core_news_sm
+# ========================================

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Icons</title>
+</head>
+<body>
+    <h1>Gerando ícones...</h1>
+    <canvas id="canvas512" width="512" height="512"></canvas>
+    <canvas id="canvas192" width="192" height="192"></canvas>
+    
+    <script>
+        // Load SVG and convert to PNG
+        const svg512 = `<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#1e40af;stop-opacity:1" />
+            </linearGradient>
+          </defs>
+          <rect width="512" height="512" rx="80" fill="url(#grad)"/>
+          <g transform="translate(256, 256)">
+            <rect x="-20" y="-180" width="40" height="360" fill="#ffffff" rx="10"/>
+            <path d="M -80,-120 Q -120,-120 -120,-80 Q -120,-40 -80,-40 L 80,-40 Q 120,-40 120,0" 
+                  stroke="#ffffff" stroke-width="60" fill="none" stroke-linecap="round"/>
+            <path d="M 80,40 Q 120,40 120,80 Q 120,120 80,120 L -80,120 Q -120,120 -120,160" 
+                  stroke="#ffffff" stroke-width="60" fill="none" stroke-linecap="round"/>
+          </g>
+          <circle cx="100" cy="100" r="15" fill="#ffffff" opacity="0.3"/>
+          <circle cx="412" cy="100" r="15" fill="#ffffff" opacity="0.3"/>
+          <circle cx="100" cy="412" r="15" fill="#ffffff" opacity="0.3"/>
+          <circle cx="412" cy="412" r="15" fill="#ffffff" opacity="0.3"/>
+        </svg>`;
+
+        function svgToPng(svgData, canvas) {
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            const blob = new Blob([svgData], {type: 'image/svg+xml'});
+            const url = URL.createObjectURL(blob);
+            
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+                
+                // Download
+                canvas.toBlob(blob => {
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `icon-${canvas.width}.png`;
+                    link.click();
+                });
+            };
+            img.src = url;
+        }
+
+        // Generate both sizes
+        setTimeout(() => {
+            svgToPng(svg512, document.getElementById('canvas512'));
+            setTimeout(() => {
+                svgToPng(svg512, document.getElementById('canvas192'));
+            }, 1000);
+        }, 100);
+    </script>
+</body>
+</html>

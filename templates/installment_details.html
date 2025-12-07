@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+
+{% block title %}Cronograma - {{ installment.description }} - BWS Finance{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Breadcrumb -->
+    <div class="mb-6">
+        <a href="{{ url_for('installments_page') }}" class="text-blue-600 hover:text-blue-700 font-medium">
+            ← Voltar para Parcelamentos
+        </a>
+    </div>
+
+    <!-- Header do Parcelamento -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-xl p-8 text-white mb-8">
+        <div class="flex justify-between items-start mb-6">
+            <div>
+                <h1 class="text-3xl font-bold mb-2">{{ installment.description }}</h1>
+                <p class="text-blue-100">
+                    {{ installment.installment_count }}x de R$ {{ "%.2f"|format(installment.installment_value) }}
+                </p>
+            </div>
+            <span class="px-4 py-2 rounded-full text-sm font-semibold {{ 'bg-green-500' if installment.current_status == 'active' else 'bg-gray-500' }}">
+                {{ 'Ativo' if installment.current_status == 'active' else 'Cancelado' }}
+            </span>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+            <div>
+                <p class="text-blue-200 text-sm">Valor Total</p>
+                <p class="text-2xl font-bold">R$ {{ "%.2f"|format(installment.total_amount) }}</p>
+            </div>
+            <div>
+                <p class="text-blue-200 text-sm">Valor Pago</p>
+                <p class="text-2xl font-bold text-green-300">R$ {{ "%.2f"|format(summary.total_paid) }}</p>
+            </div>
+            <div>
+                <p class="text-blue-200 text-sm">Pendente</p>
+                <p class="text-2xl font-bold text-yellow-300">R$ {{ "%.2f"|format(summary.total_pending) }}</p>
+            </div>
+            <div>
+                <p class="text-blue-200 text-sm">Parcelas Pagas</p>
+                <p class="text-2xl font-bold">{{ summary.paid_installments }} / {{ summary.total_installments }}</p>
+            </div>
+        </div>
+
+        <!-- Progresso -->
+        <div class="mt-6">
+            <div class="w-full bg-blue-800 rounded-full h-4">
+                {% set progress = (summary.paid_installments / summary.total_installments * 100) if summary.total_installments > 0 else 0 %}
+                <div class="bg-gradient-to-r from-green-400 to-green-500 h-4 rounded-full transition-all duration-500" style="width: {{ progress }}%"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Adicional -->
+    {% if installment.account_name or installment.card_name or installment.category_name %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-8">
+        <h2 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">📋 Informações</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {% if installment.account_name %}
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Conta</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ installment.account_name }}</p>
+            </div>
+            {% endif %}
+            {% if installment.card_name %}
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Cartão</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ installment.card_name }}</p>
+            </div>
+            {% endif %}
+            {% if installment.category_name %}
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Categoria</p>
+                <p class="font-semibold text-gray-800 dark:text-white">{{ installment.category_icon }} {{ installment.category_name }}</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Ações Rápidas -->
+    {% if installment.current_status == 'active' and summary.pending_installments > 0 %}
+    <div class="bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-200 dark:border-yellow-700 rounded-lg p-6 mb-8">
+        <div class="flex justify-between items-center">
+            <div>
+                <h3 class="text-lg font-semibold text-yellow-800 dark:text-yellow-300 mb-1">⚡ Ações Rápidas</h3>
+                <p class="text-sm text-yellow-700 dark:text-yellow-400">
+                    {{ summary.pending_installments }} parcela(s) pendente(s) no valor de R$ {{ "%.2f"|format(summary.total_pending) }}
+                </p>
+            </div>
+            <div class="flex gap-3">
+                <button onclick="payAll()" class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                    💰 Pagar Todas
+                </button>
+                <button onclick="cancelInstallment()" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-semibold transition duration-200">
+                    ❌ Cancelar Parcelamento
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Cronograma -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden">
+        <div class="bg-gray-50 dark:bg-gray-700 px-6 py-4 border-b border-gray-200 dark:border-gray-600">
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white">📅 Cronograma de Pagamento</h2>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700 text-sm text-gray-600 dark:text-gray-300">
+                    <tr>
+                        <th class="px-6 py-3 text-left font-semibold">Parcela</th>
+                        <th class="px-6 py-3 text-left font-semibold">Descrição</th>
+                        <th class="px-6 py-3 text-left font-semibold">Vencimento</th>
+                        <th class="px-6 py-3 text-right font-semibold">Valor</th>
+                        <th class="px-6 py-3 text-center font-semibold">Status</th>
+                        <th class="px-6 py-3 text-center font-semibold">Pago em</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+                    {% for item in schedule %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition duration-150 {{ 'bg-green-50 dark:bg-green-900/10' if item.status == 'Pago' else '' }}">
+                        <td class="px-6 py-4">
+                            <span class="inline-flex items-center justify-center w-10 h-10 rounded-full {{ 'bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300' if item.status == 'Pago' else 'bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300' }} font-bold">
+                                {{ item.installment_number }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-gray-800 dark:text-white font-medium">
+                            {{ item.description }}
+                        </td>
+                        <td class="px-6 py-4 text-gray-600 dark:text-gray-400">
+                            {{ item.due_date }}
+                        </td>
+                        <td class="px-6 py-4 text-right font-semibold text-gray-800 dark:text-white">
+                            R$ {{ "%.2f"|format(item.value) }}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            {% if item.status == 'Pago' %}
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300">
+                                ✓ Pago
+                            </span>
+                            {% else %}
+                            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100 dark:bg-yellow-900 text-yellow-700 dark:text-yellow-300">
+                                ⏳ Pendente
+                            </span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-center text-sm text-gray-600 dark:text-gray-400">
+                            {{ item.paid_at if item.paid_at else '-' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Resumo Final -->
+    <div class="bg-gray-50 dark:bg-gray-700 rounded-lg shadow-md p-6 mt-8">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-center">
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Total de Parcelas</p>
+                <p class="text-3xl font-bold text-gray-800 dark:text-white">{{ summary.total_installments }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Parcelas Pagas</p>
+                <p class="text-3xl font-bold text-green-600">{{ summary.paid_installments }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-1">Parcelas Pendentes</p>
+                <p class="text-3xl font-bold text-yellow-600">{{ summary.pending_installments }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function payAll() {
+    if (!confirm('Deseja pagar todas as {{ summary.pending_installments }} parcelas pendentes?\n\nTotal: R$ {{ "%.2f"|format(summary.total_pending) }}')){
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/installments/{{ installment.id }}/pay-all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.error || 'Falha ao pagar parcelas'));
+        }
+    } catch (error) {
+        alert('Erro ao processar requisição: ' + error.message);
+    }
+}
+
+async function cancelInstallment() {
+    if (!confirm('Deseja cancelar este parcelamento?\n\nParcelas pendentes serão deletadas. Parcelas já pagas serão mantidas.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/installments/{{ installment.id }}', {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            window.location.href = '{{ url_for("installments_page") }}';
+        } else {
+            alert('Erro: ' + (data.error || 'Falha ao cancelar parcelamento'));
+        }
+    } catch (error) {
+        alert('Erro ao processar requisição: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

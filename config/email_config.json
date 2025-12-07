@@ -1,0 +1,25 @@
+{
+    "smtp_host": "smtp.gmail.com",
+    "smtp_port": 587,
+    "smtp_user": "",
+    "smtp_password": "",
+    "from_email": "noreply@bwsfinance.com",
+    "from_name": "BWS Finance",
+    "_instructions": {
+        "note": "Configure suas credenciais SMTP aqui ou use variáveis de ambiente",
+        "environment_vars": [
+            "SMTP_HOST",
+            "SMTP_PORT", 
+            "SMTP_USER",
+            "SMTP_PASSWORD",
+            "FROM_EMAIL"
+        ],
+        "gmail_setup": "Para Gmail: use 'Senha de app' em vez da senha normal (https://myaccount.google.com/apppasswords)",
+        "other_providers": {
+            "outlook": "smtp-mail.outlook.com:587",
+            "yahoo": "smtp.mail.yahoo.com:587",
+            "sendgrid": "smtp.sendgrid.net:587",
+            "mailgun": "smtp.mailgun.org:587"
+        }
+    }
+}

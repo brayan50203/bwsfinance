@@ -1,0 +1,1291 @@
+﻿{% extends "base.html" %}
+
+{% block title %}Investimentos - BWS Finance{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+    <!-- Header -->
+    <div class="bg-white dark:bg-gray-800 shadow-lg mb-8">
+        <div class="container mx-auto px-6 py-8">
+            <div class="flex justify-between items-center">
+                <div>
+                    <h1 class="text-4xl font-bold text-gray-800 dark:text-white">
+                        📈 Meus Investimentos
+                    </h1>
+                    <p class="text-gray-600 dark:text-gray-400 mt-2">
+                        Acompanhe sua carteira em tempo real
+                    </p>
+                </div>
+                
+                <div class="flex gap-4">
+                    <button onclick="document.getElementById('addInvestmentModal').classList.remove('hidden')" 
+                            class="bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                        </svg>
+                        Novo Investimento
+                    </button>
+                    
+                    <button onclick="updateInvestments()" 
+                            id="updateBtn"
+                            class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                        </svg>
+                        <span id="updateText">Atualizar Agora</span>
+                    </button>
+                    
+                    <a href="{{ url_for('dashboard') }}" 
+                       class="bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2 shadow-lg">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                        </svg>
+                        Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Resumo Cards Estilo Investidor10 -->
+    <div class="container mx-auto px-6 mb-8">
+        <!-- Cards Principais -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <!-- Patrimônio Total -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <div class="flex flex-col">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">Patrimônio Total</span>
+                    <span class="text-2xl font-bold {{ 'text-green-600' if summary.profit_percent >= 0 else 'text-red-600' }}">
+                        R$ {{ summary.total_current|brl }}
+                    </span>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-sm {{ 'text-green-600' if summary.profit_percent >= 0 else 'text-red-600' }} font-semibold">
+                            {{ '+' if summary.profit_percent >= 0 else '' }}{{ summary.profit_percent|brl }}%
+                        </span>
+                        <span class="text-xs text-gray-500">{{ '+' if summary.profit_loss >= 0 else '' }}R$ {{ summary.profit_loss|brl }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lucro (Mês) -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <div class="flex flex-col">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">Lucro (Mês)</span>
+                    <span class="text-2xl font-bold text-green-600">
+                        R$ {{ "%.2f"|format(summary.profit_loss) if summary.profit_loss > 0 else "0,00" }}
+                    </span>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs text-gray-500">Saldo Total</span>
+                        <span class="text-xs text-gray-400">R$ {{ summary.total_invested|brl }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Proventos recebidos -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <div class="flex flex-col">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">Proventos recebidos (12M)</span>
+                    <span class="text-2xl font-bold text-gray-800 dark:text-white">
+                        R$ 1,44
+                    </span>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs text-gray-500">No mês</span>
+                        <span class="text-xs text-gray-400">R$ 1,27</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Variação -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <div class="flex flex-col">
+                    <span class="text-xs text-gray-500 dark:text-gray-400 mb-1">Variação</span>
+                    <span class="text-2xl font-bold {{ 'text-green-600' if summary.profit_percent >= 0 else 'text-red-600' }}">
+                        {{ '+' if summary.profit_percent >= 0 else '' }}{{ summary.profit_percent|brl }}%
+                    </span>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="text-xs {{ 'text-green-600' if summary.profit_loss >= 0 else 'text-red-600' }}">
+                            {{ '+' if summary.profit_loss >= 0 else '' }}R$ {{ summary.profit_loss|brl }}
+                        </span>
+                        <span class="text-xs text-gray-400">R$ 0,19%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabela de Ativos Estilo Investidor10 -->
+    <div class="container mx-auto px-6 mb-8">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
+            <!-- Header da Tabela -->
+            <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 class="text-xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                    📊 Meus Ativos
+                    <span class="text-sm font-normal text-gray-500">({{ all_investments|length }})</span>
+                </h2>
+            </div>
+
+            <!-- Tabela Responsiva -->
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr class="text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wider">
+                            <th class="px-6 py-3 text-left">Ativo</th>
+                            <th class="px-6 py-3 text-center">Ações</th>
+                            <th class="px-6 py-3 text-right">Preço Médio</th>
+                            <th class="px-6 py-3 text-right">Preço Atual</th>
+                            <th class="px-6 py-3 text-center">Variação</th>
+                            <th class="px-6 py-3 text-right">Valor Total</th>
+                            <th class="px-6 py-3 text-center">Rentabilidade</th>
+                            <th class="px-6 py-3 text-center">% na carteira</th>
+                            <th class="px-6 py-3 text-center">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for inv in all_investments %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                            <!-- Ativo Nome -->
+                            <td class="px-6 py-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                                        <span class="text-lg font-bold text-blue-600 dark:text-blue-400">
+                                            {% if 'cripto' in inv.investment_type|lower or 'crypto' in inv.investment_type|lower %}
+                                                ₿
+                                            {% elif 'tesouro' in inv.investment_type|lower %}
+                                                🏛️
+                                            {% elif 'fii' in inv.investment_type|lower %}
+                                                🏢
+                                            {% else %}
+                                                📈
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <div class="font-bold text-gray-800 dark:text-white">{{ inv.name }}</div>
+                                        <div class="text-xs text-gray-500">{{ inv.investment_type }}</div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Quantidade -->
+                            <td class="px-6 py-4 text-center">
+                                <span class="font-semibold text-gray-700 dark:text-gray-300">
+                                    {{ inv.quantity|default(1)|int }}
+                                </span>
+                            </td>
+
+                            <!-- Preço Médio -->
+                            <td class="px-6 py-4 text-right">
+                                <span class="text-gray-700 dark:text-gray-300">
+                                    R$ {{ "%.2f"|format(inv.amount / (inv.quantity|default(1))) }}
+                                </span>
+                            </td>
+
+                            <!-- Preço Atual -->
+                            <td class="px-6 py-4 text-right">
+                                <span class="font-semibold text-gray-800 dark:text-white">
+                                    R$ {{ "%.2f"|format(inv.current_value / (inv.quantity|default(1))) }}
+                                </span>
+                            </td>
+
+                            <!-- Variação -->
+                            <td class="px-6 py-4 text-center">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold {{ 'bg-green-100 text-green-800' if inv.profit_percent >= 0 else 'bg-red-100 text-red-800' }}">
+                                    {{ '+' if inv.profit_percent >= 0 else '' }}{{ inv.profit_percent|brl }}%
+                                </span>
+                            </td>
+
+                            <!-- Valor Total -->
+                            <td class="px-6 py-4 text-right">
+                                <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                    R$ {{ inv.current_value|brl }}
+                                </span>
+                            </td>
+
+                            <!-- Rentabilidade -->
+                            <td class="px-6 py-4 text-center">
+                                <div class="flex flex-col items-center">
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        {{ '+' if inv.profit >= 0 else '' }}{{ inv.profit_percent|brl }}%
+                                    </span>
+                                    <span class="text-xs {{ 'text-green-500' if inv.profit >= 0 else 'text-red-500' }}">
+                                        {{ '+' if inv.profit >= 0 else '' }}R$ {{ inv.profit|brl }}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- % na Carteira -->
+                            <td class="px-6 py-4 text-center">
+                                <span class="text-gray-600 dark:text-gray-400 text-sm">
+                                    {{ "%.2f"|format((inv.current_value / summary.total_current * 100) if summary.total_current > 0 else 0) }}%
+                                </span>
+                            </td>
+
+                            <!-- Ações -->
+                            <td class="px-6 py-4">
+                                <div class="flex items-center justify-center gap-2">
+                                    <button onclick="updateSingleInvestment({{ inv.id }})" 
+                                            class="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900 rounded-lg transition" 
+                                            title="Atualizar Cotação">
+                                        🔄
+                                    </button>
+                                    <button onclick="openEditModal({{ inv.id }}, '{{ inv.name }}', '{{ inv.investment_type }}', {{ inv.amount }}, {{ inv.current_value }}, {{ inv.quantity|default(1) }})" 
+                                            class="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-green-900 rounded-lg transition" 
+                                            title="Editar">
+                                        ✏️
+                                    </button>
+                                    <a href="{{ url_for('investment_details', investment_id=inv.id) }}" 
+                                       class="p-2 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900 rounded-lg transition"
+                                       title="Detalhes">
+                                        📊
+                                    </a>
+                                    <button onclick="deleteInvestment({{ inv.id }}, '{{ inv.name }}')" 
+                                            class="p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900 rounded-lg transition"
+                                            title="Excluir">
+                                        🗑️
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Resumo da Tabela -->
+            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700 border-t border-gray-200 dark:border-gray-600">
+                <div class="flex justify-between items-center text-sm">
+                    <div class="text-gray-600 dark:text-gray-400">
+                        Total: {{ all_investments|length }} ativos
+                    </div>
+                    <div class="flex gap-6 font-semibold">
+                        <div>
+                            <span class="text-gray-600 dark:text-gray-400">Investido:</span>
+                            <span class="text-gray-800 dark:text-white">R$ {{ summary.total_invested|brl }}</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-600 dark:text-gray-400">Atual:</span>
+                            <span class="{{ 'text-green-600' if summary.profit_loss >= 0 else 'text-red-600' }}">
+                                R$ {{ summary.total_current|brl }}
+                            </span>
+                        </div>
+                        <div>
+                            <span class="text-gray-600 dark:text-gray-400">Lucro:</span>
+                            <span class="{{ 'text-green-600' if summary.profit_loss >= 0 else 'text-red-600' }}">
+                                {{ '+' if summary.profit_loss >= 0 else '' }}R$ {{ summary.profit_loss|brl }}
+                                ({{ '+' if summary.profit_percent >= 0 else '' }}{{ summary.profit_percent|brl }}%)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Investimentos por Tipo (Antigo layout - pode manter ou remover) -->
+    <div class="container mx-auto px-6 pb-12">
+        <div class="space-y-8">
+            <!-- Ações -->
+            {% if investments_by_type.acao %}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-5">
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        📊 Ações B3 ({{ investments_by_type.acao|length }})
+                    </h2>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {% for inv in investments_by_type.acao %}
+                        <div class="bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-xl p-6 hover:shadow-2xl transition-all border border-gray-200 dark:border-gray-600">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-bold text-xl text-gray-800 dark:text-white">{{ inv.name }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ inv.investment_type }}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-bold {{ 'bg-green-100 text-green-800' if inv.profit >= 0 else 'bg-red-100 text-red-800' }}">
+                                    {{ '+' if inv.profit >= 0 else '' }}{{ inv.profit_percent|brl }}%
+                                </span>
+                            </div>
+                            
+                            <div class="space-y-3 mb-4">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Investido:</span>
+                                    <span class="font-bold text-gray-800 dark:text-white">R$ {{ inv.amount|brl }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Atual:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        R$ {{ inv.current_value|brl }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm bg-blue-50 dark:bg-blue-900/30 p-2 rounded">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Preço Médio:</span>
+                                    <span class="font-bold text-blue-600 dark:text-blue-400">
+                                        R$ {{ inv.amount|brl }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-600">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Lucro/Prejuízo:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        {{ '+' if inv.profit >= 0 else '' }}R$ {{ inv.profit|brl }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <!-- Mini Chart -->
+                            <div class="mb-4 bg-white dark:bg-gray-900 p-3 rounded-lg">
+                                <canvas id="chart-{{ inv.id }}" height="80"></canvas>
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <button onclick="openEditModal({{ inv.id }}, '{{ inv.name }}', '{{ inv.investment_type }}', {{ inv.amount }}, {{ inv.current_value }})" 
+                                        class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg text-sm font-medium transition">
+                                    ✏️
+                                </button>
+                                <a href="{{ url_for('investment_details', investment_id=inv.id) }}" 
+                                   class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg text-sm font-medium transition text-center">
+                                    📊 Ver Detalhes
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Criptomoedas -->
+            {% if investments_by_type.cripto %}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-orange-600 to-orange-700 px-6 py-5">
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        ₿ Criptomoedas ({{ investments_by_type.cripto|length }})
+                    </h2>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {% for inv in investments_by_type.cripto %}
+                        <div class="bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-xl p-6 hover:shadow-2xl transition-all border border-gray-200 dark:border-gray-600">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-bold text-xl text-gray-800 dark:text-white">{{ inv.name }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ inv.investment_type }}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-bold {{ 'bg-green-100 text-green-800' if inv.profit >= 0 else 'bg-red-100 text-red-800' }}">
+                                    {{ '+' if inv.profit >= 0 else '' }}{{ inv.profit_percent|brl }}%
+                                </span>
+                            </div>
+                            
+                            <div class="space-y-3 mb-4">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Investido:</span>
+                                    <span class="font-bold text-gray-800 dark:text-white">R$ {{ inv.amount|brl }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Atual:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        R$ {{ inv.current_value|brl }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-600">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Lucro/Prejuízo:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        {{ '+' if inv.profit >= 0 else '' }}R$ {{ inv.profit|brl }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4 bg-white dark:bg-gray-900 p-3 rounded-lg">
+                                <canvas id="chart-{{ inv.id }}" height="80"></canvas>
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <a href="{{ url_for('investment_details', investment_id=inv.id) }}" 
+                                   class="flex-1 bg-orange-600 hover:bg-orange-700 text-white py-2 rounded-lg text-sm font-medium transition text-center">
+                                    📊 Ver Detalhes
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Tesouro Direto -->
+            {% if investments_by_type.tesouro %}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-green-600 to-green-700 px-6 py-5">
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        🏛️ Tesouro Direto ({{ investments_by_type.tesouro|length }})
+                    </h2>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {% for inv in investments_by_type.tesouro %}
+                        <div class="bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-xl p-6 hover:shadow-2xl transition-all border border-gray-200 dark:border-gray-600">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-bold text-xl text-gray-800 dark:text-white">{{ inv.name }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ inv.investment_type }}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-bold {{ 'bg-green-100 text-green-800' if inv.profit >= 0 else 'bg-red-100 text-red-800' }}">
+                                    {{ '+' if inv.profit >= 0 else '' }}{{ inv.profit_percent|brl }}%
+                                </span>
+                            </div>
+                            
+                            <div class="space-y-3 mb-4">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Investido:</span>
+                                    <span class="font-bold text-gray-800 dark:text-white">R$ {{ inv.amount|brl }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Atual:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        R$ {{ inv.current_value|brl }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-600">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Lucro/Prejuízo:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        {{ '+' if inv.profit >= 0 else '' }}R$ {{ inv.profit|brl }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4 bg-white dark:bg-gray-900 p-3 rounded-lg">
+                                <canvas id="chart-{{ inv.id }}" height="80"></canvas>
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <a href="{{ url_for('investment_details', investment_id=inv.id) }}" 
+                                   class="flex-1 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-medium transition text-center">
+                                    📊 Ver Detalhes
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Outros Investimentos -->
+            {% if investments_by_type.etf or investments_by_type.fii or investments_by_type.outros %}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl overflow-hidden">
+                <div class="bg-gradient-to-r from-purple-600 to-purple-700 px-6 py-5">
+                    <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+                        💼 Outros Investimentos ({{ (investments_by_type.etf|length) + (investments_by_type.fii|length) + (investments_by_type.outros|length) }})
+                    </h2>
+                </div>
+                <div class="p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                        {% for inv in investments_by_type.etf + investments_by_type.fii + investments_by_type.outros %}
+                        <div class="bg-gradient-to-br from-gray-50 to-white dark:from-gray-700 dark:to-gray-800 rounded-xl p-6 hover:shadow-2xl transition-all border border-gray-200 dark:border-gray-600">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h3 class="font-bold text-xl text-gray-800 dark:text-white">{{ inv.name }}</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ inv.investment_type }}</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-xs font-bold {{ 'bg-green-100 text-green-800' if inv.profit >= 0 else 'bg-red-100 text-red-800' }}">
+                                    {{ '+' if inv.profit >= 0 else '' }}{{ inv.profit_percent|brl }}%
+                                </span>
+                            </div>
+                            
+                            <div class="space-y-3 mb-4">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Investido:</span>
+                                    <span class="font-bold text-gray-800 dark:text-white">R$ {{ inv.amount|brl }}</span>
+                                </div>
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Atual:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        R$ {{ inv.current_value|brl }}
+                                    </span>
+                                </div>
+                                <div class="flex justify-between text-sm pt-2 border-t border-gray-200 dark:border-gray-600">
+                                    <span class="text-gray-600 dark:text-gray-400 font-medium">Lucro/Prejuízo:</span>
+                                    <span class="font-bold {{ 'text-green-600' if inv.profit >= 0 else 'text-red-600' }}">
+                                        {{ '+' if inv.profit >= 0 else '' }}R$ {{ inv.profit|brl }}
+                                    </span>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4 bg-white dark:bg-gray-900 p-3 rounded-lg">
+                                <canvas id="chart-{{ inv.id }}" height="80"></canvas>
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <a href="{{ url_for('investment_details', investment_id=inv.id) }}" 
+                                   class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded-lg text-sm font-medium transition text-center">
+                                    📊 Ver Detalhes
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- Mensagem se não houver investimentos -->
+            {% if not all_investments %}
+            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-12 text-center">
+                <svg class="w-24 h-24 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                <h3 class="text-2xl font-bold text-gray-800 dark:text-white mb-2">
+                    Nenhum investimento cadastrado
+                </h3>
+                <p class="text-gray-600 dark:text-gray-400 mb-6">
+                    Comece a investir e acompanhe seus rendimentos aqui!
+                </p>
+                <a href="{{ url_for('dashboard') }}" 
+                   class="inline-block bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-3 rounded-lg font-semibold transition">
+                    Ir para o Dashboard
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Modal Adicionar Investimento -->
+<div id="addInvestmentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-5 flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-white">Adicionar Lançamento</h3>
+            <button onclick="document.getElementById('addInvestmentModal').classList.add('hidden')" 
+                    class="text-white hover:text-gray-200 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <form action="{{ url_for('add_investment') }}" method="POST" class="p-6">
+            <!-- Campo oculto para tipo de operação -->
+            <input type="hidden" name="operation_type" id="operationType" value="compra">
+            
+            <!-- Tabs: Compra / Venda -->
+            <div class="flex gap-2 mb-6 bg-gray-100 dark:bg-gray-700 rounded-xl p-1">
+                <button type="button" id="buyTab" onclick="switchTab('compra')" 
+                        class="flex-1 py-3 rounded-lg font-semibold transition bg-white dark:bg-gray-600 text-gray-800 dark:text-white shadow-md">
+                    <span class="mr-2">🔄</span> Compra
+                </button>
+                <button type="button" id="sellTab" onclick="switchTab('venda')" 
+                        class="flex-1 py-3 rounded-lg font-semibold transition text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600">
+                    <span class="mr-2">💸</span> Venda
+                </button>
+            </div>
+
+            <div class="space-y-5">
+                <!-- Linha 1: Tipo de ativo e Ativo -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Tipo de ativo
+                        </label>
+                        <select name="investment_type" required
+                                class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                            <option value="">Selecionar</option>
+                            <option value="Ações">📊 Ações</option>
+                            <option value="CDB">🏦 CDB</option>
+                            <option value="LCI">🏠 LCI</option>
+                            <option value="LCA">🌾 LCA</option>
+                            <option value="Tesouro Direto">🏛️ Tesouro Direto</option>
+                            <option value="Fundos">📈 Fundos</option>
+                            <option value="Poupança">💰 Poupança</option>
+                            <option value="Outro">💼 Outro</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Ativo
+                        </label>
+                        <div class="relative">
+                            <input type="text" name="name" id="assetName" required
+                                   class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition"
+                                   placeholder="Ex: PETR4, VALE3, Bitcoin">
+                            <div id="tickerStatus" class="absolute right-3 top-1/2 transform -translate-y-1/2 hidden">
+                                <span id="tickerValid" class="text-green-600 font-bold hidden">✓</span>
+                                <span id="tickerInvalid" class="text-red-600 font-bold hidden">✗</span>
+                                <span id="tickerLoading" class="text-gray-400 hidden">⏳</span>
+                            </div>
+                        </div>
+                        <p id="tickerPrice" class="text-xs text-gray-500 dark:text-gray-400 mt-1 hidden"></p>
+                    </div>
+                </div>
+
+                <!-- Linha 2: Data e Quantidade -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <span id="dateLabel">Data da compra</span>
+                        </label>
+                        <input type="date" name="start_date" 
+                               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Quantidade
+                        </label>
+                        <input type="number" name="quantity" step="0.01" min="0" value="1"
+                               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                    </div>
+                </div>
+
+                <!-- Linha 3: Preço e Outros custos -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <span id="priceLabel">Preço unitário em R$</span>
+                        </label>
+                        <input type="number" id="priceInput" name="price" step="0.01" min="0" required
+                               placeholder="0,00"
+                               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Outros custos
+                            <span class="text-xs text-gray-500 dark:text-gray-400">(Opcional)</span>
+                        </label>
+                        <input type="number" name="other_costs" step="0.01" min="0" value="0"
+                               placeholder="0,00"
+                               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                    </div>
+                </div>
+                
+                <!-- Hidden fields -->
+                <input type="hidden" name="amount" id="hiddenAmount" value="0">
+                <input type="hidden" name="current_value" id="hiddenCurrentValue" value="0">
+
+                <!-- Valor Total -->
+                <div class="bg-gray-100 dark:bg-gray-700 rounded-xl p-4 flex justify-between items-center">
+                    <span class="text-lg font-semibold text-gray-700 dark:text-gray-300">Valor total</span>
+                    <span id="totalValue" class="text-2xl font-bold text-gray-900 dark:text-white">R$ 0,00</span>
+                </div>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex gap-3 mt-6">
+                <button type="button" 
+                        onclick="document.getElementById('addInvestmentModal').classList.add('hidden')"
+                        class="flex-1 py-3 rounded-xl font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition">
+                    Cancelar
+                </button>
+                <button type="submit" id="submitBtn"
+                        class="flex-1 py-3 rounded-xl font-semibold bg-gray-800 dark:bg-gray-700 text-white hover:bg-gray-900 dark:hover:bg-gray-600 transition shadow-lg">
+                    <span class="mr-2">➕</span> <span id="submitText">Adicionar Compra</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal Editar Investimento -->
+<div id="editInvestmentModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-3xl max-w-2xl w-full shadow-2xl overflow-hidden">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-green-600 to-teal-600 px-6 py-5 flex justify-between items-center">
+            <h3 class="text-2xl font-bold text-white">✏️ Editar Investimento</h3>
+            <button onclick="closeEditModal()" 
+                    class="text-white hover:text-gray-200 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+
+        <form id="editInvestmentForm" class="p-6">
+            <input type="hidden" id="editInvestmentId" name="investment_id">
+            
+            <div class="space-y-5">
+                <!-- Linha 1: Tipo de ativo e Ativo -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Tipo de ativo
+                        </label>
+                        <select id="editInvestmentType" name="investment_type" required
+                                class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition">
+                            <option value="">Selecionar</option>
+                            <option value="Ações">📊 Ações</option>
+                            <option value="CDB">🏦 CDB</option>
+                            <option value="LCI">🏠 LCI</option>
+                            <option value="LCA">🌾 LCA</option>
+                            <option value="Tesouro Direto">🏛️ Tesouro Direto</option>
+                            <option value="Fundos">📈 Fundos</option>
+                            <option value="Poupança">💰 Poupança</option>
+                            <option value="Outro">💼 Outro</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Ativo
+                        </label>
+                        <input type="text" id="editAssetName" name="name" required
+                               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition"
+                               placeholder="Ex: PETR4, VALE3, Bitcoin">
+                    </div>
+                </div>
+
+                <!-- Linha 2: Quantidade e Preço Médio -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Quantidade
+                        </label>
+                        <input type="number" id="editQuantity" name="quantity" step="0.01" min="0" required
+                               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            Preço Médio (R$)
+                        </label>
+                        <input type="number" id="editAveragePrice" name="average_price" step="0.01" min="0" required
+                               class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition">
+                    </div>
+                </div>
+
+                <!-- Linha 3: Valor Total Investido (calculado) -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Valor Total Investido (R$)
+                    </label>
+                    <input type="number" id="editTotalAmount" readonly
+                           class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-600 text-gray-600 dark:text-gray-400 cursor-not-allowed"
+                           placeholder="Calculado automaticamente">
+                </div>
+
+                <!-- Descrição -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Observações
+                    </label>
+                    <textarea id="editDescription" name="description" rows="3"
+                              class="w-full px-4 py-3 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-white focus:ring-2 focus:ring-green-500 focus:border-transparent transition resize-none"
+                              placeholder="Anotações sobre este investimento..."></textarea>
+                </div>
+            </div>
+
+            <!-- Botões de ação -->
+            <div class="flex gap-3 mt-6">
+                <button type="button" onclick="closeEditModal()"
+                        class="flex-1 py-3 rounded-xl font-semibold border-2 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+                    Cancelar
+                </button>
+                <button type="submit"
+                        class="flex-1 py-3 rounded-xl font-semibold bg-green-600 text-white hover:bg-green-700 transition shadow-lg">
+                    <span class="mr-2">💾</span> Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Função para abrir modal de edição
+function openEditModal(id, name, type, amount, currentValue, quantity) {
+    console.log('Opening edit modal:', {id, name, type, amount, currentValue, quantity});
+    
+    // Preencher campos do formulário
+    document.getElementById('editInvestmentId').value = id;
+    document.getElementById('editAssetName').value = name;
+    document.getElementById('editInvestmentType').value = type;
+    document.getElementById('editQuantity').value = quantity || 1;
+    
+    // Calcular preço médio
+    const avgPrice = quantity > 0 ? amount / quantity : amount;
+    document.getElementById('editAveragePrice').value = avgPrice.toFixed(2);
+    document.getElementById('editTotalAmount').value = amount.toFixed(2);
+    
+    // Mostrar modal
+    document.getElementById('editInvestmentModal').classList.remove('hidden');
+}
+
+// Função para fechar modal de edição
+function closeEditModal() {
+    document.getElementById('editInvestmentModal').classList.add('hidden');
+    document.getElementById('editInvestmentForm').reset();
+}
+
+// Atualizar valor total quando quantidade ou preço médio mudar
+document.getElementById('editQuantity')?.addEventListener('input', updateEditTotal);
+document.getElementById('editAveragePrice')?.addEventListener('input', updateEditTotal);
+
+function updateEditTotal() {
+    const quantity = parseFloat(document.getElementById('editQuantity').value) || 0;
+    const avgPrice = parseFloat(document.getElementById('editAveragePrice').value) || 0;
+    const total = quantity * avgPrice;
+    document.getElementById('editTotalAmount').value = total.toFixed(2);
+}
+
+// Submeter formulário de edição
+document.getElementById('editInvestmentForm')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const investmentId = document.getElementById('editInvestmentId').value;
+    const formData = new FormData(this);
+    
+    // Calcular amount com base em quantidade × preço médio
+    const quantity = parseFloat(formData.get('quantity'));
+    const avgPrice = parseFloat(formData.get('average_price'));
+    const amount = quantity * avgPrice;
+    
+    const data = {
+        name: formData.get('name'),
+        investment_type: formData.get('investment_type'),
+        quantity: quantity,
+        amount: amount,
+        description: formData.get('description') || ''
+    };
+    
+    try {
+        const response = await fetch(`/investments/edit/${investmentId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok) {
+            alert('✅ Investimento atualizado com sucesso!');
+            closeEditModal();
+            location.reload(); // Recarregar página para mostrar alterações
+        } else {
+            alert('❌ Erro ao atualizar: ' + (result.error || 'Falha desconhecida'));
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Erro ao conectar com o servidor: ' + error.message);
+    }
+});
+
+// Função para trocar entre Compra e Venda
+function switchTab(type) {
+    const buyTab = document.getElementById('buyTab');
+    const sellTab = document.getElementById('sellTab');
+    const operationType = document.getElementById('operationType');
+    const dateLabel = document.getElementById('dateLabel');
+    const priceLabel = document.getElementById('priceLabel');
+    const submitText = document.getElementById('submitText');
+    
+    if (type === 'compra') {
+        // Ativar tab Compra
+        buyTab.className = 'flex-1 py-3 rounded-lg font-semibold transition bg-white dark:bg-gray-600 text-gray-800 dark:text-white shadow-md';
+        sellTab.className = 'flex-1 py-3 rounded-lg font-semibold transition text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600';
+        
+        // Atualizar labels
+        dateLabel.textContent = 'Data da compra';
+        priceLabel.textContent = 'Preço unitário em R$';
+        submitText.textContent = 'Adicionar Compra';
+        operationType.value = 'compra';
+    } else {
+        // Ativar tab Venda
+        sellTab.className = 'flex-1 py-3 rounded-lg font-semibold transition bg-white dark:bg-gray-600 text-gray-800 dark:text-white shadow-md';
+        buyTab.className = 'flex-1 py-3 rounded-lg font-semibold transition text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-600';
+        
+        // Atualizar labels
+        dateLabel.textContent = 'Data da venda';
+        priceLabel.textContent = 'Preço unitário de venda em R$';
+        submitText.textContent = 'Adicionar Venda';
+        operationType.value = 'venda';
+    }
+}
+
+// Validar ticker em tempo real
+let tickerTimeout;
+let currentTickerPrice = 0;
+
+async function validateTicker(ticker) {
+    const tickerStatus = document.getElementById('tickerStatus');
+    const tickerValid = document.getElementById('tickerValid');
+    const tickerInvalid = document.getElementById('tickerInvalid');
+    const tickerLoading = document.getElementById('tickerLoading');
+    const tickerPrice = document.getElementById('tickerPrice');
+    const priceInput = document.getElementById('priceInput');
+    
+    if (!ticker || ticker.length < 2) {
+        tickerStatus.classList.add('hidden');
+        tickerPrice.classList.add('hidden');
+        currentTickerPrice = 0;
+        return;
+    }
+    
+    // Mostrar loading
+    tickerStatus.classList.remove('hidden');
+    tickerValid.classList.add('hidden');
+    tickerInvalid.classList.add('hidden');
+    tickerLoading.classList.remove('hidden');
+    tickerPrice.classList.add('hidden');
+    
+    try {
+        // Chamar API backend (mais confiável)
+        const response = await fetch(`/api/quote/${encodeURIComponent(ticker)}`);
+        const data = await response.json();
+        
+        if (data.success && data.price && data.price > 0) {
+            currentTickerPrice = data.price;
+            
+            // Mostrar sucesso
+            tickerLoading.classList.add('hidden');
+            tickerValid.classList.remove('hidden');
+            tickerPrice.classList.remove('hidden');
+            
+            // Formatar mensagem
+            const changeIndicator = data.change_percent >= 0 ? '📈' : '📉';
+            const changeColor = data.change_percent >= 0 ? 'text-green-600' : 'text-red-600';
+            
+            tickerPrice.innerHTML = `
+                <span class="font-semibold">${data.name}</span> - 
+                <span class="text-gray-900 dark:text-white font-bold">R$ ${data.price.toFixed(2)}</span>
+                <span class="${changeColor}"> ${changeIndicator} ${data.change_percent.toFixed(2)}%</span>
+            `;
+            tickerPrice.className = 'text-xs mt-1';
+            
+            // Preencher preço automaticamente SE o campo estiver vazio
+            if (priceInput && (!priceInput.value || parseFloat(priceInput.value) === 0)) {
+                priceInput.value = data.price.toFixed(2);
+                updateTotal(); // Atualizar total
+            }
+        } else {
+            // Não encontrou
+            currentTickerPrice = 0;
+            tickerLoading.classList.add('hidden');
+            tickerInvalid.classList.remove('hidden');
+            tickerPrice.classList.remove('hidden');
+            tickerPrice.textContent = data.error || 'Ativo não encontrado';
+            tickerPrice.className = 'text-xs text-red-500 dark:text-red-400 mt-1';
+        }
+    } catch (error) {
+        console.error('Erro ao buscar cotação:', error);
+        currentTickerPrice = 0;
+        tickerLoading.classList.add('hidden');
+        tickerInvalid.classList.remove('hidden');
+        tickerPrice.classList.remove('hidden');
+        tickerPrice.textContent = 'Erro ao buscar cotação';
+        tickerPrice.className = 'text-xs text-red-500 dark:text-red-400 mt-1';
+    }
+}
+
+// Calcular valor total automaticamente
+function updateTotal() {
+    const modal = document.getElementById('addInvestmentModal');
+    if (!modal) return;
+    
+    const quantityInput = modal.querySelector('input[name="quantity"]');
+    const priceInput = document.getElementById('priceInput');
+    const costsInput = modal.querySelector('input[name="other_costs"]');
+    const totalDisplay = document.getElementById('totalValue');
+    const hiddenAmount = document.getElementById('hiddenAmount');
+    const hiddenCurrentValue = document.getElementById('hiddenCurrentValue');
+    
+    const quantity = parseFloat(quantityInput?.value || 0);
+    const price = parseFloat(priceInput?.value || 0);
+    const costs = parseFloat(costsInput?.value || 0);
+    
+    // Calcular valores
+    const totalInvested = (quantity * price) + costs;  // Valor total investido
+    const currentValue = quantity * price;  // Valor atual (quantidade * preço unitário)
+    
+    if (totalDisplay) {
+        totalDisplay.textContent = `R$ ${totalInvested.toFixed(2).replace('.', ',')}`;
+    }
+    
+    // Atualizar campos hidden
+    // amount = valor total investido (quantidade * preço + custos)
+    // current_value = valor de mercado atual (quantidade * preço)
+    if (hiddenAmount) {
+        hiddenAmount.value = totalInvested.toFixed(2);
+    }
+    if (hiddenCurrentValue) {
+        hiddenCurrentValue.value = currentValue.toFixed(2);
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const modal = document.getElementById('addInvestmentModal');
+    if (!modal) return;
+
+    const quantityInput = modal.querySelector('input[name="quantity"]');
+    const priceInput = document.getElementById('priceInput');
+    const costsInput = modal.querySelector('input[name="other_costs"]');
+    const assetNameInput = document.getElementById('assetName');
+
+    if (quantityInput) quantityInput.addEventListener('input', updateTotal);
+    if (priceInput) priceInput.addEventListener('input', updateTotal);
+    if (costsInput) costsInput.addEventListener('input', updateTotal);
+    
+    // Validar ticker ao digitar (buscar cotação automaticamente)
+    if (assetNameInput) {
+        assetNameInput.addEventListener('input', function() {
+            clearTimeout(tickerTimeout);
+            const ticker = this.value.trim();
+            
+            if (ticker.length >= 2) {
+                tickerTimeout = setTimeout(() => {
+                    console.log('🔍 Buscando cotação para:', ticker);
+                    validateTicker(ticker);
+                }, 1000); // Aguarda 1 segundo após parar de digitar
+            }
+        });
+        
+        // Também buscar quando o usuário sair do campo
+        assetNameInput.addEventListener('blur', function() {
+            const ticker = this.value.trim();
+            if (ticker.length >= 2) {
+                console.log('🔍 Buscando cotação (blur) para:', ticker);
+                validateTicker(ticker);
+            }
+        });
+    }
+    
+    // Definir data de hoje no campo de data
+    const dateInput = modal.querySelector('input[name="start_date"]');
+    if (dateInput && !dateInput.value) {
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.value = today;
+    }
+    
+    updateTotal();
+});
+</script>
+
+
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-2xl p-8 flex flex-col items-center gap-4 shadow-2xl">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-4 border-indigo-600"></div>
+        <p class="text-gray-800 dark:text-white font-semibold text-lg">Atualizando investimentos...</p>
+        <p class="text-gray-600 dark:text-gray-400 text-sm">Buscando cotações em tempo real</p>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+// Função para atualizar investimentos
+async function updateInvestments() {
+    const btn = document.getElementById('updateBtn');
+    const text = document.getElementById('updateText');
+    const overlay = document.getElementById('loadingOverlay');
+    
+    // Mostrar loading
+    btn.disabled = true;
+    text.textContent = 'Atualizando...';
+    overlay.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('/investments/update-quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            text.textContent = `Atualizado ✅ (${data.updated} ativos)`;
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            alert('Erro: ' + (data.error || 'Falha ao atualizar'));
+            text.textContent = 'Atualizar Agora';
+            btn.disabled = false;
+            overlay.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('Erro de conexão. Tente novamente.');
+        text.textContent = 'Atualizar Agora';
+        btn.disabled = false;
+        overlay.classList.add('hidden');
+    }
+}
+
+// Função para atualizar um único investimento
+async function updateSingleInvestment(investmentId) {
+    const overlay = document.getElementById('loadingOverlay');
+    
+    // Confirmar ação
+    if (!confirm('Deseja atualizar a cotação deste investimento?')) {
+        return;
+    }
+    
+    // Mostrar loading
+    overlay.classList.remove('hidden');
+    
+    try {
+        const response = await fetch('/investments/update-quotes', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Investimento atualizado com sucesso!`);
+            location.reload();
+        } else {
+            alert('❌ Erro ao atualizar: ' + (data.error || 'Falha desconhecida'));
+            overlay.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        alert('❌ Erro de conexão. Tente novamente.');
+        overlay.classList.add('hidden');
+    }
+}
+
+// Função para excluir investimento
+async function deleteInvestment(investmentId, investmentName) {
+    // Confirmar exclusão
+    if (!confirm(`Tem certeza que deseja excluir o investimento "${investmentName}"?\n\nEsta ação não pode ser desfeita!`)) {
+        return;
+    }
+    
+    const overlay = document.getElementById('loadingOverlay');
+    
+    try {
+        // Mostrar loading
+        if (overlay) overlay.classList.remove('hidden');
+        
+        console.log('🗑️ Deletando investimento ID:', investmentId);
+        
+        const url = `/investments/delete/${investmentId}`;
+        console.log('📡 URL:', url);
+        
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json'
+            },
+            credentials: 'same-origin'
+        });
+        
+        console.log('📥 Status da resposta:', response.status);
+        
+        // Ler o corpo da resposta apenas UMA VEZ
+        const responseText = await response.text();
+        
+        if (response.ok) {
+            try {
+                const data = JSON.parse(responseText);
+                console.log('✅ Sucesso:', data);
+                alert(`✅ Investimento "${investmentName}" excluído com sucesso!`);
+                location.reload();
+            } catch (e) {
+                console.error('❌ Erro ao parsear JSON:', e);
+                alert('✅ Investimento excluído, recarregando página...');
+                location.reload();
+            }
+        } else {
+            let errorMsg = `Erro ${response.status}`;
+            
+            try {
+                const data = JSON.parse(responseText);
+                errorMsg = data.error || errorMsg;
+            } catch (e) {
+                console.error('❌ Resposta não-JSON:', responseText);
+                if (response.status === 404) {
+                    errorMsg = 'Rota não encontrada. Verifique se o servidor está atualizado.';
+                } else if (response.status === 401) {
+                    errorMsg = 'Sessão expirada. Faça login novamente.';
+                    setTimeout(() => window.location.href = '/login', 2000);
+                } else {
+                    errorMsg = `Erro ${response.status}: ${responseText.substring(0, 100)}`;
+                }
+            }
+            
+            console.error('❌ Erro:', errorMsg);
+            alert('❌ Erro ao excluir: ' + errorMsg);
+            if (overlay) overlay.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('❌ Erro de conexão:', error);
+        alert(`❌ Erro de conexão: ${error.message}\n\nVerifique se o servidor está rodando.`);
+        if (overlay) overlay.classList.add('hidden');
+    }
+}
+
+// Função para editar investimento (abre modal)
+function editInvestment(investmentId, investmentName, investmentType, amount, currentValue, quantity) {
+    alert(`🔧 Edição em desenvolvimento!\n\nInvestimento: ${investmentName}\nTipo: ${investmentType}\nQuantidade: ${quantity}\nValor Investido: R$ ${amount.toFixed(2)}\nValor Atual: R$ ${currentValue.toFixed(2)}\n\nEm breve você poderá editar estes valores!`);
+}
+
+// Criar mini charts para cada investimento
+{% for inv in all_investments %}
+(function() {
+    const canvas = document.getElementById('chart-{{ inv.id }}');
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const amount = {{ inv.amount }};
+    const current = {{ inv.current_value }};
+    
+    // Simular histórico (6 meses)
+    const data = [
+        amount,
+        amount * 1.01,
+        amount * 1.02,
+        amount * 1.04,
+        amount * 1.06,
+        current
+    ];
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: ['6m', '5m', '4m', '3m', '2m', 'Hoje'],
+            datasets: [{
+                data: data,
+                borderColor: '{{ "#10b981" if inv.profit >= 0 else "#ef4444" }}',
+                backgroundColor: '{{ "rgba(16, 185, 129, 0.1)" if inv.profit >= 0 else "rgba(239, 68, 68, 0.1)" }}',
+                tension: 0.4,
+                fill: true,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return 'R$ ' + context.parsed.y.toFixed(2);
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { 
+                    display: true,
+                    grid: { display: false },
+                    ticks: { color: '#9ca3af', font: { size: 10 } }
+                },
+                y: { 
+                    display: false,
+                    grid: { display: false }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            }
+        }
+    });
+})();
+{% endfor %}
+</script>
+{% endblock %}
+

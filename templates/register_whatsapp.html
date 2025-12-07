@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro WhatsApp - BWS Finance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full">
+        <!-- Logo/Header -->
+        <div class="text-center mb-8">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 text-white text-3xl font-bold w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                💬
+            </div>
+            <h1 class="text-3xl font-bold text-gray-800 mb-2">Cadastro WhatsApp</h1>
+            <p class="text-gray-600">Registre-se para usar o assistente financeiro via WhatsApp</p>
+        </div>
+
+        <!-- Formulário -->
+        <form id="registerForm" class="space-y-4">
+            <!-- Nome -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Nome Completo
+                </label>
+                <input 
+                    type="text" 
+                    id="name" 
+                    name="name" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    placeholder="João da Silva"
+                >
+            </div>
+
+            <!-- Email -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    E-mail
+                </label>
+                <input 
+                    type="email" 
+                    id="email" 
+                    name="email" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    placeholder="joao@email.com"
+                >
+            </div>
+
+            <!-- WhatsApp -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Número WhatsApp
+                </label>
+                <input 
+                    type="tel" 
+                    id="whatsapp" 
+                    name="whatsapp" 
+                    required
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    placeholder="+55 11 91234-5678"
+                    maxlength="20"
+                >
+                <p class="text-xs text-gray-500 mt-1">
+                    Com código do país (+55 para Brasil)
+                </p>
+            </div>
+
+            <!-- Senha -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">
+                    Senha
+                </label>
+                <input 
+                    type="password" 
+                    id="password" 
+                    name="password" 
+                    required
+                    minlength="6"
+                    class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                    placeholder="Mínimo 6 caracteres"
+                >
+            </div>
+
+            <!-- Botão Submit -->
+            <button 
+                type="submit" 
+                id="submitBtn"
+                class="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-lg hover:from-blue-700 hover:to-indigo-700 transition transform hover:scale-105 shadow-lg"
+            >
+                📱 Cadastrar e Ativar WhatsApp
+            </button>
+        </form>
+
+        <!-- Mensagem de Resposta -->
+        <div id="message" class="mt-4 hidden"></div>
+
+        <!-- Link para Login -->
+        <div class="text-center mt-6 text-sm text-gray-600">
+            Já tem conta? 
+            <a href="/" class="text-blue-600 font-semibold hover:underline">
+                Fazer login
+            </a>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('registerForm');
+        const messageDiv = document.getElementById('message');
+        const submitBtn = document.getElementById('submitBtn');
+        const whatsappInput = document.getElementById('whatsapp');
+
+        // Formatar WhatsApp enquanto digita
+        whatsappInput.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, '');
+            
+            if (!value.startsWith('55') && value.length > 0) {
+                value = '55' + value;
+            }
+            
+            if (value.length > 0) {
+                value = '+' + value;
+            }
+            
+            e.target.value = value;
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const whatsapp = document.getElementById('whatsapp').value.trim();
+            const password = document.getElementById('password').value;
+
+            // Validações
+            if (!name || !email || !whatsapp || !password) {
+                showMessage('Por favor, preencha todos os campos', 'error');
+                return;
+            }
+
+            if (password.length < 6) {
+                showMessage('A senha deve ter no mínimo 6 caracteres', 'error');
+                return;
+            }
+
+            if (!whatsapp.startsWith('+55')) {
+                showMessage('WhatsApp deve começar com +55', 'error');
+                return;
+            }
+
+            // Desabilitar botão
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '⏳ Cadastrando...';
+
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        email: email,
+                        whatsapp: whatsapp,
+                        password: password
+                    })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    showMessage(
+                        `✅ Cadastro realizado com sucesso!<br><br>
+                        📱 Agora você pode enviar mensagens para:<br>
+                        <strong>+5511947626417</strong><br><br>
+                        Redirecionando para o login...`,
+                        'success'
+                    );
+
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 3000);
+                } else {
+                    showMessage(data.error || 'Erro ao cadastrar', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = '📱 Cadastrar e Ativar WhatsApp';
+                }
+
+            } catch (error) {
+                console.error('Erro:', error);
+                showMessage('Erro de conexão. Tente novamente.', 'error');
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '📱 Cadastrar e Ativar WhatsApp';
+            }
+        });
+
+        function showMessage(text, type) {
+            messageDiv.innerHTML = text;
+            messageDiv.className = `mt-4 p-4 rounded-lg ${
+                type === 'success' 
+                    ? 'bg-green-100 border border-green-400 text-green-700' 
+                    : 'bg-red-100 border border-red-400 text-red-700'
+            }`;
+            messageDiv.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>

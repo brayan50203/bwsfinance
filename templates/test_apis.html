@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Teste APIs - BWS Finance</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .result {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { border-left: 4px solid #10b981; }
+        .error { border-left: 4px solid #ef4444; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #2563eb; }
+        pre {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Teste de APIs - BWS Finance</h1>
+    
+    <button onclick="testAccounts()">📊 Testar Contas</button>
+    <button onclick="testCards()">💳 Testar Cartões</button>
+    <button onclick="testCategories()">📂 Testar Categorias</button>
+    <button onclick="testAll()">🚀 Testar Tudo</button>
+    
+    <div id="results"></div>
+    
+    <script>
+        const resultsDiv = document.getElementById('results');
+        
+        async function testAccounts() {
+            addResult('📊 Testando /api/accounts...', 'info');
+            try {
+                const response = await fetch('/api/accounts');
+                const data = await response.json();
+                if (data.success) {
+                    addResult(`✅ Contas: ${data.accounts.length} encontradas`, 'success');
+                    addResult(JSON.stringify(data.accounts.slice(0, 3), null, 2), 'code');
+                } else {
+                    addResult(`❌ Erro: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Exceção: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCards() {
+            addResult('💳 Testando /api/cards...', 'info');
+            try {
+                const response = await fetch('/api/cards');
+                const data = await response.json();
+                if (data.success) {
+                    addResult(`✅ Cartões: ${data.cards.length} encontrados`, 'success');
+                    addResult(JSON.stringify(data.cards, null, 2), 'code');
+                } else {
+                    addResult(`❌ Erro: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Exceção: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testCategories() {
+            addResult('📂 Testando /api/categories...', 'info');
+            try {
+                const response = await fetch('/api/categories');
+                const data = await response.json();
+                if (data.success) {
+                    const receitas = data.categories.filter(c => c.type === 'Receita');
+                    const despesas = data.categories.filter(c => c.type === 'Despesa');
+                    addResult(`✅ Categorias: ${data.categories.length} (${receitas.length} receitas, ${despesas.length} despesas)`, 'success');
+                    addResult(JSON.stringify(data.categories.slice(0, 5), null, 2), 'code');
+                } else {
+                    addResult(`❌ Erro: ${data.error}`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Exceção: ${error.message}`, 'error');
+            }
+        }
+        
+        async function testAll() {
+            resultsDiv.innerHTML = '';
+            await testAccounts();
+            await testCards();
+            await testCategories();
+        }
+        
+        function addResult(text, type) {
+            const div = document.createElement('div');
+            div.className = `result ${type}`;
+            
+            if (type === 'code') {
+                const pre = document.createElement('pre');
+                pre.textContent = text;
+                div.appendChild(pre);
+            } else {
+                div.textContent = text;
+            }
+            
+            resultsDiv.appendChild(div);
+        }
+        
+        // Testar tudo ao carregar
+        window.onload = () => testAll();
+    </script>
+</body>
+</html>

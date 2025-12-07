@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - BWS Finance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .notification-badge {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+        .tab-active {
+            border-bottom: 3px solid #667eea;
+            color: #667eea;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navbar -->
+    <nav class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <a href="/dashboard" class="text-2xl font-bold hover:text-blue-200">💰 BWS Finance</a>
+            </div>
+            <div class="flex items-center space-x-6">
+                <a href="/dashboard" class="hover:text-blue-200">Dashboard</a>
+                <a href="/transactions" class="hover:text-blue-200">Transações</a>
+                <a href="/investments" class="hover:text-blue-200">Investimentos</a>
+                
+                <!-- Sino de Notificações -->
+                <div class="relative">
+                    <button id="notificationBell" class="relative hover:text-blue-200">
+                        🔔
+                        <span id="notificationBadge" class="notification-badge absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold hidden">
+                            0
+                        </span>
+                    </button>
+                    
+                    <!-- Dropdown de Notificações -->
+                    <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl z-50 border border-gray-200">
+                        <div class="p-4 border-b flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">Notificações</h3>
+                            <button id="markAllRead" class="text-sm text-blue-600 hover:text-blue-700">Marcar todas como lidas</button>
+                        </div>
+                        <div id="notificationList" class="max-h-96 overflow-y-auto">
+                            <!-- Notificações serão carregadas aqui -->
+                        </div>
+                        <div class="p-3 border-t text-center">
+                            <a href="/settings" class="text-blue-600 hover:text-blue-700 text-sm font-medium">⚙️ Configurações</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <span class="text-blue-200">{{ user.name }}</span>
+                <a href="/logout" class="bg-red-500 px-4 py-2 rounded hover:bg-red-600">Sair</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto mt-8 px-4">
+        <div class="max-w-6xl mx-auto">
+            <h1 class="text-3xl font-bold mb-8 text-gray-800">⚙️ Configurações</h1>
+            
+            <!-- Tabs -->
+            <div class="bg-white rounded-lg shadow-md mb-6">
+                <div class="flex border-b overflow-x-auto">
+                    <button class="tab px-6 py-4 text-gray-600 hover:text-blue-600 whitespace-nowrap tab-active" data-tab="perfil">
+                        👤 Perfil
+                    </button>
+                    <button class="tab px-6 py-4 text-gray-600 hover:text-blue-600 whitespace-nowrap" data-tab="notificacoes">
+                        🔔 Notificações
+                    </button>
+                    <button class="tab px-6 py-4 text-gray-600 hover:text-blue-600 whitespace-nowrap" data-tab="seguranca">
+                        🔒 Segurança
+                    </button>
+                    <button class="tab px-6 py-4 text-gray-600 hover:text-blue-600 whitespace-nowrap" data-tab="preferencias">
+                        🎨 Preferências
+                    </button>
+                    <button class="tab px-6 py-4 text-gray-600 hover:text-blue-600 whitespace-nowrap" data-tab="integracao">
+                        🔗 Integrações
+                    </button>
+                </div>
+
+                <!-- TAB: Perfil -->
+                <div id="tab-perfil" class="tab-content p-6">
+                    <h2 class="text-xl font-bold mb-6">Informações Pessoais</h2>
+                    
+                    <!-- Foto de Perfil -->
+                    <div class="flex items-center mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-4xl font-bold">
+                            {{ user.name[0].upper() }}
+                        </div>
+                        <div class="ml-6">
+                            <h3 class="font-bold text-lg">{{ user.name }}</h3>
+                            <p class="text-gray-600">{{ user.email }}</p>
+                            <button class="mt-2 text-blue-600 hover:text-blue-700 text-sm font-medium">
+                                📷 Alterar Foto
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Formulário de Perfil -->
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Nome Completo</label>
+                            <input type="text" id="profile_name" value="{{ user.name }}" 
+                                   class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">E-mail</label>
+                            <input type="email" id="profile_email" value="{{ user.email }}" 
+                                   class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Telefone</label>
+                                <input type="tel" id="profile_phone" placeholder="+55 11 99999-9999" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Data de Nascimento</label>
+                                <input type="date" id="profile_birthdate" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <label class="block text-sm font-medium mb-2">Sobre Mim</label>
+                            <textarea id="profile_bio" rows="3" 
+                                      class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                                      placeholder="Conte um pouco sobre você..."></textarea>
+                        </div>
+                        
+                        <button id="saveProfile" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold">
+                            💾 Salvar Perfil
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB: Notificações -->
+                <div id="tab-notificacoes" class="tab-content p-6 hidden">
+                    <h2 class="text-xl font-bold mb-6">Central de Notificações</h2>
+                    
+                    <!-- Canais de Notificação -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">Canais de Envio</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">💻</span>
+                                    <div>
+                                        <div class="font-semibold">Sistema (Dashboard)</div>
+                                        <div class="text-sm text-gray-600">Notificações no painel</div>
+                                    </div>
+                                </div>
+                                <input type="checkbox" id="enable_system" class="w-6 h-6 text-blue-600" checked>
+                            </label>
+                            
+                            <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">📧</span>
+                                    <div>
+                                        <div class="font-semibold">E-mail</div>
+                                        <div class="text-sm text-gray-600">Receber por e-mail</div>
+                                    </div>
+                                </div>
+                                <input type="checkbox" id="enable_email" class="w-6 h-6 text-blue-600">
+                            </label>
+                            
+                            <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">📱</span>
+                                    <div>
+                                        <div class="font-semibold">WhatsApp</div>
+                                        <div class="text-sm text-gray-600">Receber via WhatsApp</div>
+                                    </div>
+                                </div>
+                                <input type="checkbox" id="enable_whatsapp" class="w-6 h-6 text-blue-600">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Limites de Alertas -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">Limites de Alertas</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">💸 Alerta de Gasto Alto (R$)</label>
+                                <input type="number" id="high_expense_threshold" value="500" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                                       placeholder="500.00" step="50">
+                                <p class="text-sm text-gray-600 mt-1">Valor que gera alerta de gasto alto</p>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium mb-2">📈 Alerta de Variação de Investimento (%)</label>
+                                <input type="number" id="investment_change_threshold" value="5" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                                       placeholder="5.0" step="1">
+                                <p class="text-sm text-gray-600 mt-1">Percentual de mudança que gera alerta</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Horário Permitido -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">🌙 Horário de Silêncio</h3>
+                        <p class="text-gray-600 mb-4">Não receber notificações entre:</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Início</label>
+                                <input type="time" id="quiet_hours_start" value="22:00" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Fim</label>
+                                <input type="time" id="quiet_hours_end" value="08:00" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Contatos -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">📞 Contatos</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">📧 E-mail para Notificações</label>
+                                <input type="email" id="email_address" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                                       placeholder="seu@email.com">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">📱 WhatsApp</label>
+                                <input type="tel" id="whatsapp_number" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none"
+                                       placeholder="+55 11 99999-9999">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Relatórios -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">📊 Relatórios Automáticos</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <span>📅 Resumo Diário</span>
+                                <input type="checkbox" id="daily_summary" class="w-5 h-5 text-blue-600" checked>
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <span>📈 Relatório Semanal</span>
+                                <input type="checkbox" id="weekly_report" class="w-5 h-5 text-blue-600" checked>
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <span>📊 Relatório Mensal</span>
+                                <input type="checkbox" id="monthly_report" class="w-5 h-5 text-blue-600" checked>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- IA -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">🧠 Inteligência Artificial</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <div>
+                                    <div class="font-semibold">Insights de IA</div>
+                                    <div class="text-sm text-gray-600">Análises automáticas do comportamento</div>
+                                </div>
+                                <input type="checkbox" id="enable_ai_insights" class="w-5 h-5 text-blue-600" checked>
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <div>
+                                    <div class="font-semibold">Detecção de Padrões</div>
+                                    <div class="text-sm text-gray-600">Identificar gastos duplicados e anormais</div>
+                                </div>
+                                <input type="checkbox" id="enable_pattern_detection" class="w-5 h-5 text-blue-600" checked>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button id="saveNotifications" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold">
+                        💾 Salvar Configurações de Notificações
+                    </button>
+                </div>
+
+                <!-- TAB: Segurança -->
+                <div id="tab-seguranca" class="tab-content p-6 hidden">
+                    <h2 class="text-xl font-bold mb-6">Segurança da Conta</h2>
+                    
+                    <!-- Alterar Senha -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-semibold text-lg mb-4">🔐 Alterar Senha</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Senha Atual</label>
+                                <input type="password" id="current_password" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Nova Senha</label>
+                                <input type="password" id="new_password" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Confirmar Nova Senha</label>
+                                <input type="password" id="confirm_password" 
+                                       class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                            </div>
+                            <button id="changePassword" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold">
+                                🔑 Alterar Senha
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Autenticação de Dois Fatores -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-semibold text-lg mb-4">🔒 Autenticação de Dois Fatores (2FA)</h3>
+                        <p class="text-gray-600 mb-4">Adicione uma camada extra de segurança à sua conta</p>
+                        {% if user.two_factor_enabled %}
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center">
+                                <span class="text-green-600 text-2xl mr-3">✓</span>
+                                <div>
+                                    <div class="font-semibold">2FA Ativado</div>
+                                    <div class="text-sm text-gray-600">Sua conta está protegida</div>
+                                </div>
+                            </div>
+                            <button class="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600">
+                                Desativar 2FA
+                            </button>
+                        </div>
+                        {% else %}
+                        <button class="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 font-bold">
+                            🛡️ Ativar 2FA
+                        </button>
+                        {% endif %}
+                    </div>
+                    
+                    <!-- Sessões Ativas -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-semibold text-lg mb-4">📱 Sessões Ativas</h3>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-3 bg-white rounded-lg">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">💻</span>
+                                    <div>
+                                        <div class="font-semibold">Windows PC</div>
+                                        <div class="text-sm text-gray-600">Última atividade: agora</div>
+                                    </div>
+                                </div>
+                                <span class="text-green-600 font-semibold">Atual</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Excluir Conta -->
+                    <div class="mb-6 p-4 bg-red-50 rounded-lg border-2 border-red-200">
+                        <h3 class="font-semibold text-lg mb-2 text-red-600">⚠️ Zona de Perigo</h3>
+                        <p class="text-gray-600 mb-4">Uma vez excluída, não há como voltar atrás</p>
+                        <button onclick="deleteAccount()" class="bg-red-600 text-white px-6 py-3 rounded-lg hover:bg-red-700 font-bold">
+                            🗑️ Excluir Conta
+                        </button>
+                    </div>
+                </div>
+
+                <!-- TAB: Preferências -->
+                <div id="tab-preferencias" class="tab-content p-6 hidden">
+                    <h2 class="text-xl font-bold mb-6">Preferências do Sistema</h2>
+                    
+                    <!-- Idioma e Região -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">🌍 Idioma e Região</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Idioma</label>
+                                <select class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                                    <option value="pt-BR" selected>Português (Brasil)</option>
+                                    <option value="en-US">English (US)</option>
+                                    <option value="es-ES">Español</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Moeda</label>
+                                <select class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                                    <option value="BRL" selected>Real (R$)</option>
+                                    <option value="USD">Dólar ($)</option>
+                                    <option value="EUR">Euro (€)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Fuso Horário</label>
+                                <select class="w-full border-2 rounded-lg px-4 py-3 focus:border-blue-500 focus:outline-none">
+                                    <option value="America/Sao_Paulo" selected>Brasília (GMT-3)</option>
+                                    <option value="America/New_York">Nova York (GMT-5)</option>
+                                    <option value="Europe/London">Londres (GMT+0)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Aparência -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">🎨 Aparência</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">🌙</span>
+                                    <div>
+                                        <div class="font-semibold">Modo Escuro</div>
+                                        <div class="text-sm text-gray-600">Interface com cores escuras</div>
+                                    </div>
+                                </div>
+                                <input type="checkbox" class="w-6 h-6 text-blue-600">
+                            </label>
+                            
+                            <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <div class="flex items-center">
+                                    <span class="text-2xl mr-3">📊</span>
+                                    <div>
+                                        <div class="font-semibold">Dashboard Compacto</div>
+                                        <div class="text-sm text-gray-600">Menos espaçamento, mais informação</div>
+                                    </div>
+                                </div>
+                                <input type="checkbox" class="w-6 h-6 text-blue-600">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <!-- Privacidade -->
+                    <div class="mb-6">
+                        <h3 class="font-semibold text-lg mb-4">🔐 Privacidade</h3>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <span>Mostrar saldo na tela inicial</span>
+                                <input type="checkbox" class="w-5 h-5 text-blue-600" checked>
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <span>Salvar histórico de pesquisa</span>
+                                <input type="checkbox" class="w-5 h-5 text-blue-600" checked>
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                                <span>Permitir cookies de análise</span>
+                                <input type="checkbox" class="w-5 h-5 text-blue-600">
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <button class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold">
+                        💾 Salvar Preferências
+                    </button>
+                </div>
+
+                <!-- TAB: Integrações -->
+                <div id="tab-integracao" class="tab-content p-6 hidden">
+                    <h2 class="text-xl font-bold mb-6">Integrações e Conectividade</h2>
+                    
+                    <!-- WhatsApp -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="text-3xl mr-3">💬</span>
+                                <div>
+                                    <h3 class="font-semibold text-lg">WhatsApp</h3>
+                                    <p class="text-sm text-gray-600">Envie transações e receba notificações</p>
+                                </div>
+                            </div>
+                            <button class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700">
+                                Conectar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Open Banking -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="text-3xl mr-3">🏦</span>
+                                <div>
+                                    <h3 class="font-semibold text-lg">Open Banking</h3>
+                                    <p class="text-sm text-gray-600">Sincronize com seu banco automaticamente</p>
+                                </div>
+                            </div>
+                            <button class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">
+                                Conectar Banco
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- APIs Externas -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <div class="flex items-center justify-between mb-4">
+                            <div class="flex items-center">
+                                <span class="text-3xl mr-3">🔌</span>
+                                <div>
+                                    <h3 class="font-semibold text-lg">APIs Externas</h3>
+                                    <p class="text-sm text-gray-600">Conecte com outros serviços</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="space-y-3">
+                            <div class="flex items-center justify-between p-3 bg-white rounded-lg">
+                                <div class="flex items-center">
+                                    <span class="mr-3">📈</span>
+                                    <span>Brapi (Cotações)</span>
+                                </div>
+                                <span class="text-green-600 font-semibold">✓ Conectado</span>
+                            </div>
+                            <div class="flex items-center justify-between p-3 bg-white rounded-lg">
+                                <div class="flex items-center">
+                                    <span class="mr-3">💹</span>
+                                    <span>Investidor10</span>
+                                </div>
+                                <span class="text-green-600 font-semibold">✓ Conectado</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Backup -->
+                    <div class="mb-6 p-4 bg-gray-50 rounded-lg">
+                        <h3 class="font-semibold text-lg mb-4">💾 Backup Automático</h3>
+                        <p class="text-gray-600 mb-4">Configure backup automático dos seus dados</p>
+                        <div class="space-y-3">
+                            <label class="flex items-center justify-between p-3 bg-white rounded-lg cursor-pointer">
+                                <span>Google Drive</span>
+                                <input type="checkbox" class="w-5 h-5 text-blue-600">
+                            </label>
+                            <label class="flex items-center justify-between p-3 bg-white rounded-lg cursor-pointer">
+                                <span>Dropbox</span>
+                                <input type="checkbox" class="w-5 h-5 text-blue-600">
+                            </label>
+                        </div>
+                        <button class="mt-4 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 font-bold">
+                            ⚙️ Configurar Backup
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sistema de Tabs
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabName = this.dataset.tab;
+                
+                // Remover active de todas as tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('tab-active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                
+                // Ativar tab clicada
+                this.classList.add('tab-active');
+                document.getElementById('tab-' + tabName).classList.remove('hidden');
+            });
+        });
+        
+        // Notificações
+        document.addEventListener('DOMContentLoaded', () => {
+            loadNotifications();
+            loadNotificationPreferences();
+            setInterval(loadNotifications, 30000);
+        });
+        
+        document.getElementById('notificationBell').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('notificationDropdown').classList.toggle('hidden');
+        });
+        
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('notificationDropdown');
+            const bell = document.getElementById('notificationBell');
+            if (!dropdown.contains(e.target) && !bell.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+        
+        async function loadNotifications() {
+            try {
+                const response = await fetch('/api/notifications?limit=10');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const badge = document.getElementById('notificationBadge');
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                    
+                    renderNotifications(data.notifications);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar notificações:', error);
+            }
+        }
+        
+        function renderNotifications(notifications) {
+            const list = document.getElementById('notificationList');
+            
+            if (notifications.length === 0) {
+                list.innerHTML = '<div class="p-8 text-center text-gray-500">Nenhuma notificação</div>';
+                return;
+            }
+            
+            list.innerHTML = notifications.map(notif => `
+                <div class="p-4 border-b hover:bg-gray-50 ${notif.status === 'unread' ? 'bg-blue-50' : ''}" data-id="${notif.id}">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-800">${notif.title}</div>
+                            <div class="text-sm text-gray-600 mt-1">${notif.message}</div>
+                            <div class="text-xs text-gray-400 mt-2">${formatDate(notif.created_at)}</div>
+                        </div>
+                        ${notif.status === 'unread' ? 
+                            `<button onclick="markAsRead(${notif.id})" class="text-blue-600 text-sm hover:text-blue-700 ml-2">Marcar</button>` : 
+                            `<button onclick="deleteNotification(${notif.id})" class="text-red-600 text-sm hover:text-red-700 ml-2">✕</button>`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function markAsRead(id) {
+            try {
+                await fetch(`/api/notifications/${id}/read`, { method: 'PATCH' });
+                loadNotifications();
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        }
+        
+        async function deleteNotification(id) {
+            try {
+                await fetch(`/api/notifications/${id}`, { method: 'DELETE' });
+                loadNotifications();
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        }
+        
+        document.getElementById('markAllRead').addEventListener('click', async function() {
+            try {
+                await fetch('/api/notifications/read-all', { method: 'PATCH' });
+                loadNotifications();
+            } catch (error) {
+                console.error('Erro:', error);
+            }
+        });
+        
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (hours < 1) return 'Agora';
+            if (hours < 24) return `${hours}h atrás`;
+            if (days < 7) return `${days}d atrás`;
+            return date.toLocaleDateString('pt-BR');
+        }
+        
+        // Carregar preferências de notificações
+        async function loadNotificationPreferences() {
+            try {
+                const response = await fetch('/api/notifications/preferences');
+                const data = await response.json();
+                
+                if (data.success && data.preferences) {
+                    const prefs = data.preferences;
+                    document.getElementById('enable_system').checked = prefs.enable_system;
+                    document.getElementById('enable_email').checked = prefs.enable_email;
+                    document.getElementById('enable_whatsapp').checked = prefs.enable_whatsapp;
+                    document.getElementById('high_expense_threshold').value = prefs.high_expense_threshold || 500;
+                    document.getElementById('investment_change_threshold').value = prefs.investment_change_threshold || 5;
+                    document.getElementById('quiet_hours_start').value = prefs.quiet_hours_start || '22:00';
+                    document.getElementById('quiet_hours_end').value = prefs.quiet_hours_end || '08:00';
+                    document.getElementById('email_address').value = prefs.email_address || '';
+                    document.getElementById('whatsapp_number').value = prefs.whatsapp_number || '';
+                    document.getElementById('daily_summary').checked = prefs.daily_summary;
+                    document.getElementById('weekly_report').checked = prefs.weekly_report;
+                    document.getElementById('monthly_report').checked = prefs.monthly_report;
+                    document.getElementById('enable_ai_insights').checked = prefs.enable_ai_insights;
+                    document.getElementById('enable_pattern_detection').checked = prefs.enable_pattern_detection;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar preferências:', error);
+            }
+        }
+        
+        // Salvar notificações
+        document.getElementById('saveNotifications').addEventListener('click', async function() {
+            const button = this;
+            button.disabled = true;
+            button.textContent = '⏳ Salvando...';
+            
+            const preferences = {
+                enable_system: document.getElementById('enable_system').checked,
+                enable_email: document.getElementById('enable_email').checked,
+                enable_whatsapp: document.getElementById('enable_whatsapp').checked,
+                high_expense_threshold: parseFloat(document.getElementById('high_expense_threshold').value),
+                investment_change_threshold: parseFloat(document.getElementById('investment_change_threshold').value),
+                quiet_hours_start: document.getElementById('quiet_hours_start').value,
+                quiet_hours_end: document.getElementById('quiet_hours_end').value,
+                email_address: document.getElementById('email_address').value,
+                whatsapp_number: document.getElementById('whatsapp_number').value,
+                daily_summary: document.getElementById('daily_summary').checked,
+                weekly_report: document.getElementById('weekly_report').checked,
+                monthly_report: document.getElementById('monthly_report').checked,
+                enable_ai_insights: document.getElementById('enable_ai_insights').checked,
+                enable_pattern_detection: document.getElementById('enable_pattern_detection').checked
+            };
+            
+            try {
+                const response = await fetch('/api/notifications/preferences', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(preferences)
+                });
+                
+                if (response.ok) {
+                    button.textContent = '✅ Salvo!';
+                    button.classList.add('bg-green-600');
+                    setTimeout(() => {
+                        button.textContent = '💾 Salvar Configurações de Notificações';
+                        button.classList.remove('bg-green-600');
+                        button.disabled = false;
+                    }, 2000);
+                }
+            } catch (error) {
+                button.textContent = '❌ Erro';
+                console.error('Erro:', error);
+                setTimeout(() => {
+                    button.textContent = '💾 Salvar Configurações de Notificações';
+                    button.disabled = false;
+                }, 2000);
+            }
+        });
+        
+        // Salvar perfil
+        document.getElementById('saveProfile').addEventListener('click', async function() {
+            const button = this;
+            button.disabled = true;
+            button.textContent = '⏳ Salvando...';
+            
+            const profile = {
+                name: document.getElementById('profile_name').value,
+                phone: document.getElementById('profile_phone').value,
+                birthdate: document.getElementById('profile_birthdate').value,
+                bio: document.getElementById('profile_bio').value
+            };
+            
+            try {
+                const response = await fetch('/api/profile', {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(profile)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    button.textContent = '✅ Salvo!';
+                    button.classList.add('bg-green-600');
+                    setTimeout(() => {
+                        button.textContent = '💾 Salvar Perfil';
+                        button.classList.remove('bg-green-600');
+                        button.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                button.textContent = '❌ Erro';
+                alert('Erro ao salvar: ' + error.message);
+                setTimeout(() => {
+                    button.textContent = '💾 Salvar Perfil';
+                    button.disabled = false;
+                }, 2000);
+            }
+        });
+        
+        // Alterar senha
+        document.getElementById('changePassword').addEventListener('click', async function() {
+            const button = this;
+            const currentPassword = document.getElementById('current_password').value;
+            const newPassword = document.getElementById('new_password').value;
+            const confirmPassword = document.getElementById('confirm_password').value;
+            
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                alert('Preencha todos os campos');
+                return;
+            }
+            
+            if (newPassword !== confirmPassword) {
+                alert('As senhas não coincidem');
+                return;
+            }
+            
+            if (newPassword.length < 6) {
+                alert('A senha deve ter no mínimo 6 caracteres');
+                return;
+            }
+            
+            button.disabled = true;
+            button.textContent = '⏳ Alterando...';
+            
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        current_password: currentPassword,
+                        new_password: newPassword,
+                        confirm_password: confirmPassword
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    button.textContent = '✅ Alterada!';
+                    button.classList.add('bg-green-600');
+                    document.getElementById('current_password').value = '';
+                    document.getElementById('new_password').value = '';
+                    document.getElementById('confirm_password').value = '';
+                    alert('Senha alterada com sucesso!');
+                    setTimeout(() => {
+                        button.textContent = '🔑 Alterar Senha';
+                        button.classList.remove('bg-green-600');
+                        button.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error(data.message);
+                }
+            } catch (error) {
+                button.textContent = '❌ Erro';
+                alert('Erro: ' + error.message);
+                setTimeout(() => {
+                    button.textContent = '🔑 Alterar Senha';
+                    button.disabled = false;
+                }, 2000);
+            }
+        });
+        
+        // Carregar dados do perfil
+        async function loadProfileData() {
+            try {
+                const response = await fetch('/api/profile');
+                const data = await response.json();
+                
+                if (data.success && data.profile) {
+                    const profile = data.profile;
+                    if (profile.phone) document.getElementById('profile_phone').value = profile.phone;
+                    if (profile.birthdate) document.getElementById('profile_birthdate').value = profile.birthdate;
+                    if (profile.bio) document.getElementById('profile_bio').value = profile.bio;
+                }
+            } catch (error) {
+                console.error('Erro ao carregar perfil:', error);
+            }
+        }
+        
+        // Carregar preferências
+        async function loadPreferences() {
+            try {
+                const response = await fetch('/api/preferences');
+                const data = await response.json();
+                
+                if (data.success && data.preferences) {
+                    const prefs = data.preferences;
+                    // Atualizar campos (implementar conforme necessário)
+                    console.log('Preferências carregadas:', prefs);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar preferências:', error);
+            }
+        }
+        
+        // Excluir conta
+        window.deleteAccount = async function() {
+            if (!confirm('⚠️ ATENÇÃO: Esta ação é IRREVERSÍVEL!\n\nTodos os seus dados serão permanentemente excluídos:\n- Transações\n- Investimentos\n- Contas\n- Cartões\n- Notificações\n\nDeseja realmente excluir sua conta?')) {
+                return;
+            }
+            
+            const password = prompt('Digite sua senha para confirmar:');
+            if (!password) return;
+            
+            try {
+                const response = await fetch('/api/account/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('Conta excluída com sucesso. Você será redirecionado.');
+                    window.location.href = '/login';
+                } else {
+                    alert('Erro: ' + data.message);
+                }
+            } catch (error) {
+                alert('Erro ao excluir conta: ' + error.message);
+            }
+        };
+        
+        // Carregar dados ao iniciar
+        loadProfileData();
+        loadPreferences();
+    </script>
+</body>
+</html>

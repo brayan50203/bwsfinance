@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações de Notificações - BWS Finance</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .notification-badge {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .5; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navbar -->
+    <nav class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <div>
+                <a href="/dashboard" class="text-2xl font-bold hover:text-blue-200">💰 BWS Finance</a>
+            </div>
+            <div class="flex items-center space-x-6">
+                <a href="/dashboard" class="hover:text-blue-200">Dashboard</a>
+                <a href="/transactions" class="hover:text-blue-200">Transações</a>
+                <a href="/investments" class="hover:text-blue-200">Investimentos</a>
+                
+                <!-- Sino de Notificações -->
+                <div class="relative">
+                    <button id="notificationBell" class="relative hover:text-blue-200">
+                        🔔
+                        <span id="notificationBadge" class="notification-badge absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold hidden">
+                            0
+                        </span>
+                    </button>
+                    
+                    <!-- Dropdown de Notificações -->
+                    <div id="notificationDropdown" class="hidden absolute right-0 mt-2 w-96 bg-white rounded-lg shadow-xl z-50 border border-gray-200">
+                        <div class="p-4 border-b flex justify-between items-center">
+                            <h3 class="font-bold text-gray-800">Notificações</h3>
+                            <button id="markAllRead" class="text-sm text-blue-600 hover:text-blue-700">Marcar todas como lidas</button>
+                        </div>
+                        <div id="notificationList" class="max-h-96 overflow-y-auto">
+                            <!-- Notificações serão carregadas aqui -->
+                        </div>
+                        <div class="p-3 border-t text-center">
+                            <a href="/notifications/preferences" class="text-blue-600 hover:text-blue-700 text-sm font-medium">⚙️ Configurações</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <span class="text-blue-200">{{ user.name }}</span>
+                <a href="/logout" class="bg-red-500 px-4 py-2 rounded hover:bg-red-600">Sair</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto mt-8 px-4 max-w-4xl">
+        <h1 class="text-3xl font-bold mb-8 text-gray-800">⚙️ Configurações de Notificações</h1>
+        
+        <!-- Canais de Notificação -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Canais de Envio</h2>
+            <p class="text-gray-600 mb-4">Escolha como deseja receber as notificações</p>
+            
+            <div class="space-y-4">
+                <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">💻</span>
+                        <div>
+                            <div class="font-semibold">Sistema (Dashboard)</div>
+                            <div class="text-sm text-gray-600">Notificações no painel</div>
+                        </div>
+                    </div>
+                    <input type="checkbox" id="enable_system" class="w-6 h-6 text-blue-600" {{ 'checked' if preferences.enable_system else '' }}>
+                </label>
+                
+                <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">📧</span>
+                        <div>
+                            <div class="font-semibold">E-mail</div>
+                            <div class="text-sm text-gray-600">Receber por e-mail</div>
+                        </div>
+                    </div>
+                    <input type="checkbox" id="enable_email" class="w-6 h-6 text-blue-600" {{ 'checked' if preferences.enable_email else '' }}>
+                </label>
+                
+                <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">📱</span>
+                        <div>
+                            <div class="font-semibold">WhatsApp</div>
+                            <div class="text-sm text-gray-600">Receber via WhatsApp</div>
+                        </div>
+                    </div>
+                    <input type="checkbox" id="enable_whatsapp" class="w-6 h-6 text-blue-600" {{ 'checked' if preferences.enable_whatsapp else '' }}>
+                </label>
+                
+                <label class="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <div class="flex items-center">
+                        <span class="text-2xl mr-3">🔔</span>
+                        <div>
+                            <div class="font-semibold">Notificações Push</div>
+                            <div class="text-sm text-gray-600">Alertas no navegador</div>
+                        </div>
+                    </div>
+                    <input type="checkbox" id="enable_push" class="w-6 h-6 text-blue-600" {{ 'checked' if preferences.enable_push else '' }}>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Limites de Alertas -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">Limites de Alertas</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">💸 Gasto Alto (R$)</label>
+                    <input type="number" id="high_expense_threshold" value="{{ preferences.high_expense_threshold }}" 
+                           class="w-full border-2 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                           placeholder="500.00" step="50">
+                    <p class="text-sm text-gray-600 mt-1">Valor que gera alerta de gasto alto</p>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">📈 Variação de Investimento (%)</label>
+                    <input type="number" id="investment_change_threshold" value="{{ preferences.investment_change_threshold }}" 
+                           class="w-full border-2 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                           placeholder="5.0" step="1">
+                    <p class="text-sm text-gray-600 mt-1">Percentual de mudança que gera alerta</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Horário Permitido -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">🌙 Horário Permitido</h2>
+            <p class="text-gray-600 mb-4">Não receber notificações entre:</p>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Início</label>
+                    <input type="time" id="quiet_hours_start" value="{{ preferences.quiet_hours_start }}" 
+                           class="w-full border-2 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">Fim</label>
+                    <input type="time" id="quiet_hours_end" value="{{ preferences.quiet_hours_end }}" 
+                           class="w-full border-2 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contatos -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">📞 Contatos para Notificações</h2>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">📧 E-mail</label>
+                    <input type="email" id="email_address" value="{{ preferences.email_address or '' }}" 
+                           class="w-full border-2 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                           placeholder="seu@email.com">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium mb-2">📱 WhatsApp</label>
+                    <input type="tel" id="whatsapp_number" value="{{ preferences.whatsapp_number or '' }}" 
+                           class="w-full border-2 rounded-lg px-4 py-2 focus:border-blue-500 focus:outline-none"
+                           placeholder="+55 11 99999-9999">
+                </div>
+            </div>
+        </div>
+        
+        <!-- Relatórios Automáticos -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">📊 Relatórios Automáticos</h2>
+            
+            <div class="space-y-3">
+                <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <span>📅 Resumo Diário</span>
+                    <input type="checkbox" id="daily_summary" class="w-5 h-5 text-blue-600" {{ 'checked' if preferences.daily_summary else '' }}>
+                </label>
+                
+                <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <span>📈 Relatório Semanal</span>
+                    <input type="checkbox" id="weekly_report" class="w-5 h-5 text-blue-600" {{ 'checked' if preferences.weekly_report else '' }}>
+                </label>
+                
+                <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <span>📊 Relatório Mensal</span>
+                    <input type="checkbox" id="monthly_report" class="w-5 h-5 text-blue-600" {{ 'checked' if preferences.monthly_report else '' }}>
+                </label>
+            </div>
+        </div>
+        
+        <!-- IA e Análises -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 class="text-xl font-bold mb-4 text-gray-800">🧠 Inteligência Artificial</h2>
+            
+            <div class="space-y-3">
+                <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <div>
+                        <div class="font-semibold">Insights de IA</div>
+                        <div class="text-sm text-gray-600">Análises automáticas do seu comportamento financeiro</div>
+                    </div>
+                    <input type="checkbox" id="enable_ai_insights" class="w-5 h-5 text-blue-600" {{ 'checked' if preferences.enable_ai_insights else '' }}>
+                </label>
+                
+                <label class="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 cursor-pointer">
+                    <div>
+                        <div class="font-semibold">Detecção de Padrões</div>
+                        <div class="text-sm text-gray-600">Identificar gastos duplicados e anormais</div>
+                    </div>
+                    <input type="checkbox" id="enable_pattern_detection" class="w-5 h-5 text-blue-600" {{ 'checked' if preferences.enable_pattern_detection else '' }}>
+                </label>
+            </div>
+        </div>
+        
+        <!-- Botão Salvar -->
+        <div class="flex justify-end mb-8">
+            <button id="saveBtn" class="bg-blue-600 text-white px-8 py-3 rounded-lg hover:bg-blue-700 font-bold shadow-lg">
+                💾 Salvar Configurações
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Carregar notificações ao abrir página
+        document.addEventListener('DOMContentLoaded', () => {
+            loadNotifications();
+            
+            // Atualizar a cada 30 segundos
+            setInterval(loadNotifications, 30000);
+        });
+        
+        // Sino de notificações
+        document.getElementById('notificationBell').addEventListener('click', function(e) {
+            e.stopPropagation();
+            const dropdown = document.getElementById('notificationDropdown');
+            dropdown.classList.toggle('hidden');
+            
+            if (!dropdown.classList.contains('hidden')) {
+                loadNotifications();
+            }
+        });
+        
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('notificationDropdown');
+            const bell = document.getElementById('notificationBell');
+            
+            if (!dropdown.contains(e.target) && !bell.contains(e.target)) {
+                dropdown.classList.add('hidden');
+            }
+        });
+        
+        // Carregar notificações
+        async function loadNotifications() {
+            try {
+                const response = await fetch('/api/notifications?limit=10');
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Atualizar badge
+                    const badge = document.getElementById('notificationBadge');
+                    if (data.unread_count > 0) {
+                        badge.textContent = data.unread_count;
+                        badge.classList.remove('hidden');
+                    } else {
+                        badge.classList.add('hidden');
+                    }
+                    
+                    // Renderizar lista
+                    renderNotifications(data.notifications);
+                }
+            } catch (error) {
+                console.error('Erro ao carregar notificações:', error);
+            }
+        }
+        
+        // Renderizar notificações
+        function renderNotifications(notifications) {
+            const list = document.getElementById('notificationList');
+            
+            if (notifications.length === 0) {
+                list.innerHTML = '<div class="p-8 text-center text-gray-500">Nenhuma notificação</div>';
+                return;
+            }
+            
+            list.innerHTML = notifications.map(notif => `
+                <div class="p-4 border-b hover:bg-gray-50 ${notif.status === 'unread' ? 'bg-blue-50' : ''}" data-id="${notif.id}">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <div class="font-semibold text-gray-800">${notif.title}</div>
+                            <div class="text-sm text-gray-600 mt-1">${notif.message}</div>
+                            <div class="text-xs text-gray-400 mt-2">${formatDate(notif.created_at)}</div>
+                        </div>
+                        ${notif.status === 'unread' ? 
+                            `<button onclick="markAsRead(${notif.id})" class="text-blue-600 text-sm hover:text-blue-700 ml-2">Marcar como lida</button>` : 
+                            `<button onclick="deleteNotification(${notif.id})" class="text-red-600 text-sm hover:text-red-700 ml-2">✕</button>`
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Marcar como lida
+        async function markAsRead(id) {
+            try {
+                const response = await fetch(`/api/notifications/${id}/read`, {
+                    method: 'PATCH'
+                });
+                
+                if (response.ok) {
+                    loadNotifications();
+                }
+            } catch (error) {
+                console.error('Erro ao marcar como lida:', error);
+            }
+        }
+        
+        // Marcar todas como lidas
+        document.getElementById('markAllRead').addEventListener('click', async function() {
+            try {
+                const response = await fetch('/api/notifications/read-all', {
+                    method: 'PATCH'
+                });
+                
+                if (response.ok) {
+                    loadNotifications();
+                }
+            } catch (error) {
+                console.error('Erro ao marcar todas como lidas:', error);
+            }
+        });
+        
+        // Deletar notificação
+        async function deleteNotification(id) {
+            try {
+                const response = await fetch(`/api/notifications/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    loadNotifications();
+                }
+            } catch (error) {
+                console.error('Erro ao deletar notificação:', error);
+            }
+        }
+        
+        // Formatar data
+        function formatDate(dateStr) {
+            const date = new Date(dateStr);
+            const now = new Date();
+            const diff = now - date;
+            const hours = Math.floor(diff / 3600000);
+            const days = Math.floor(diff / 86400000);
+            
+            if (hours < 1) return 'Agora mesmo';
+            if (hours < 24) return `${hours}h atrás`;
+            if (days < 7) return `${days}d atrás`;
+            return date.toLocaleDateString('pt-BR');
+        }
+        
+        // Salvar configurações
+        document.getElementById('saveBtn').addEventListener('click', async function() {
+            const button = this;
+            button.disabled = true;
+            button.textContent = '⏳ Salvando...';
+            
+            const preferences = {
+                enable_system: document.getElementById('enable_system').checked,
+                enable_email: document.getElementById('enable_email').checked,
+                enable_whatsapp: document.getElementById('enable_whatsapp').checked,
+                enable_push: document.getElementById('enable_push').checked,
+                high_expense_threshold: parseFloat(document.getElementById('high_expense_threshold').value),
+                investment_change_threshold: parseFloat(document.getElementById('investment_change_threshold').value),
+                quiet_hours_start: document.getElementById('quiet_hours_start').value,
+                quiet_hours_end: document.getElementById('quiet_hours_end').value,
+                email_address: document.getElementById('email_address').value,
+                whatsapp_number: document.getElementById('whatsapp_number').value,
+                daily_summary: document.getElementById('daily_summary').checked,
+                weekly_report: document.getElementById('weekly_report').checked,
+                monthly_report: document.getElementById('monthly_report').checked,
+                enable_ai_insights: document.getElementById('enable_ai_insights').checked,
+                enable_pattern_detection: document.getElementById('enable_pattern_detection').checked
+            };
+            
+            try {
+                const response = await fetch('/api/notifications/preferences', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(preferences)
+                });
+                
+                if (response.ok) {
+                    button.textContent = '✅ Salvo!';
+                    button.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+                    button.classList.add('bg-green-600');
+                    
+                    setTimeout(() => {
+                        button.textContent = '💾 Salvar Configurações';
+                        button.classList.remove('bg-green-600');
+                        button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                        button.disabled = false;
+                    }, 2000);
+                } else {
+                    throw new Error('Falha ao salvar');
+                }
+            } catch (error) {
+                button.textContent = '❌ Erro ao salvar';
+                button.classList.add('bg-red-600');
+                console.error('Erro ao salvar preferências:', error);
+                
+                setTimeout(() => {
+                    button.textContent = '💾 Salvar Configurações';
+                    button.classList.remove('bg-red-600');
+                    button.classList.add('bg-blue-600');
+                    button.disabled = false;
+                }, 2000);
+            }
+        });
+    </script>
+</body>
+</html>

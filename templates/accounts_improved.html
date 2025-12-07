@@ -1,0 +1,374 @@
+{% extends "base.html" %}
+
+{% block title %}Contas - BWS Finance{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">🏦 Minhas Contas</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Gerencie suas contas bancárias e saldos</p>
+        </div>
+        <button onclick="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition duration-200 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Nova Conta
+        </button>
+    </div>
+
+    <!-- Card de Resumo -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-blue-100">Total de Contas</p>
+                <span class="text-3xl">🏦</span>
+            </div>
+            <p class="text-3xl font-bold">{{ accounts|length }}</p>
+        </div>
+
+        <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-green-100">Saldo Total</p>
+                <span class="text-3xl">💰</span>
+            </div>
+            <p class="text-3xl font-bold">
+                {% set total_balance = accounts|sum(attribute='current_balance') %}
+                R$ {{ "%.2f"|format(total_balance) }}
+            </p>
+        </div>
+
+        <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-purple-100">Maior Saldo</p>
+                <span class="text-3xl">👑</span>
+            </div>
+            {% if accounts %}
+                {% set max_account = accounts|sort(attribute='current_balance', reverse=true)|first %}
+                <p class="text-2xl font-bold">R$ {{ "%.2f"|format(max_account.current_balance) }}</p>
+                <p class="text-purple-100 text-sm">{{ max_account.name }}</p>
+            {% else %}
+                <p class="text-2xl font-bold">R$ 0,00</p>
+            {% endif %}
+        </div>
+
+        <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-xl p-6 text-white">
+            <div class="flex items-center justify-between mb-2">
+                <p class="text-orange-100">Contas Ativas</p>
+                <span class="text-3xl">✓</span>
+            </div>
+            <p class="text-3xl font-bold">
+                {{ accounts|selectattr('active', 'equalto', 1)|list|length }}
+            </p>
+        </div>
+    </div>
+
+    <!-- Lista de Contas -->
+    {% if accounts %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for account in accounts %}
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-xl transition duration-300 overflow-hidden">
+                <!-- Header do Card -->
+                <div class="bg-gradient-to-r {{ 
+                    'from-blue-600 to-blue-700' if account.type == 'Corrente' 
+                    else 'from-green-600 to-green-700' if account.type == 'Poupança'
+                    else 'from-purple-600 to-purple-700' if account.type == 'Investimento'
+                    else 'from-yellow-600 to-yellow-700'
+                }} p-4 text-white">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xl font-bold">{{ account.name }}</h3>
+                            <p class="text-sm opacity-90 mt-1">
+                                {{ account.type }}
+                                {% if account.bank %} • {{ account.bank }}{% endif %}
+                            </p>
+                        </div>
+                        <span class="text-3xl">
+                            {% if account.type == 'Corrente' %}🏦
+                            {% elif account.type == 'Poupança' %}🐷
+                            {% elif account.type == 'Investimento' %}📈
+                            {% else %}💰{% endif %}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Corpo do Card -->
+                <div class="p-6">
+                    <!-- Saldo Atual -->
+                    <div class="mb-4">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Saldo Atual</p>
+                        <p class="text-3xl font-bold {{ 'text-green-600' if account.current_balance >= 0 else 'text-red-600' }}">
+                            R$ {{ "%.2f"|format(account.current_balance) }}
+                        </p>
+                    </div>
+
+                    <!-- Saldo Inicial -->
+                    <div class="mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                        <p class="text-sm text-gray-600 dark:text-gray-400">Saldo Inicial</p>
+                        <p class="text-lg font-semibold text-gray-800 dark:text-white">
+                            R$ {{ "%.2f"|format(account.initial_balance) }}
+                        </p>
+                    </div>
+
+                    <!-- Estatísticas -->
+                    {% if account.total_income or account.total_expense %}
+                    <div class="grid grid-cols-2 gap-3 mb-4 pb-4 border-b border-gray-200 dark:border-gray-700">
+                        <div>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">Receitas</p>
+                            <p class="text-sm font-semibold text-green-600">
+                                +R$ {{ "%.2f"|format(account.total_income or 0) }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-xs text-gray-600 dark:text-gray-400">Despesas</p>
+                            <p class="text-sm font-semibold text-red-600">
+                                -R$ {{ "%.2f"|format(account.total_expense or 0) }}
+                            </p>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Info Adicional -->
+                    <div class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                        <p>Criada em: {{ account.created_at[:10] }}</p>
+                        {% if account.updated_at %}
+                        <p>Atualizada: {{ account.updated_at[:10] }}</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Ações -->
+                    <div class="flex gap-2">
+                        <button onclick="openEditModal('{{ account.id }}', '{{ account.name }}', '{{ account.type }}', {{ account.initial_balance }})" 
+                                class="bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition duration-200"
+                                title="Editar Conta">
+                            ✏️
+                        </button>
+                        <button onclick="viewTransactions('{{ account.id }}', '{{ account.name }}')" 
+                                class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition duration-200">
+                            Ver Transações
+                        </button>
+                        <button onclick="recalculateBalance('{{ account.id }}', '{{ account.name }}')" 
+                                class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg text-sm font-medium transition duration-200"
+                                title="Recalcular Saldo">
+                            🔄
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
+            <div class="text-6xl mb-4">🏦</div>
+            <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Nenhuma conta cadastrada</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">Crie sua primeira conta para começar a gerenciar suas finanças</p>
+            <button onclick="openAddModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Criar Conta
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal: Adicionar Conta -->
+<div id="addAccountModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg mx-4">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white rounded-t-lg">
+            <h2 class="text-2xl font-bold">🏦 Nova Conta</h2>
+            <p class="text-blue-100 mt-1">Adicione uma conta bancária ou carteira</p>
+        </div>
+
+        <!-- Form -->
+        <form action="{{ url_for('add_account') }}" method="POST" class="p-6">
+            <!-- Nome -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nome da Conta *
+                </label>
+                <input type="text" name="name" required 
+                       placeholder="Ex: Nubank, Banco do Brasil, Carteira"
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+            </div>
+
+            <!-- Tipo -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Tipo de Conta *
+                </label>
+                <select name="type" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                    <option value="Corrente">🏦 Conta Corrente</option>
+                    <option value="Poupança">🐷 Poupança</option>
+                    <option value="Investimento">📈 Investimentos</option>
+                    <option value="Carteira">💰 Carteira/Dinheiro</option>
+                </select>
+            </div>
+
+            <!-- Banco -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Banco (opcional)
+                </label>
+                <input type="text" name="bank" 
+                       placeholder="Ex: Nubank, Itaú, Bradesco, C6"
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+            </div>
+
+            <!-- Saldo Inicial -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Saldo Inicial (R$) *
+                </label>
+                <input type="number" name="initial_balance" step="0.01" value="0.00" required
+                       placeholder="0.00"
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Informe o saldo atual da conta. Este valor será o ponto de partida.
+                </p>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex gap-3">
+                <button type="button" onclick="closeAddModal()" 
+                        class="flex-1 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-800 dark:text-white py-3 px-6 rounded-lg font-semibold transition duration-200">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold transition duration-200">
+                    Criar Conta
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Modal: Editar Conta -->
+<div id="editAccountModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-lg mx-4">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-yellow-600 to-yellow-700 p-6 text-white rounded-t-lg">
+            <h2 class="text-2xl font-bold">✏️ Editar Conta</h2>
+            <p class="text-yellow-100 mt-1">Atualize os dados da conta</p>
+        </div>
+
+        <!-- Form -->
+        <form action="{{ url_for('edit_account') }}" method="POST" class="p-6">
+            <input type="hidden" name="account_id" id="edit_account_id">
+            
+            <!-- Nome -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Nome da Conta *
+                </label>
+                <input type="text" name="name" id="edit_name" required 
+                       placeholder="Ex: Nubank, Banco do Brasil, Carteira"
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white">
+            </div>
+
+            <!-- Tipo -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Tipo de Conta *
+                </label>
+                <select name="type" id="edit_type" required class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white">
+                    <option value="Corrente">🏦 Conta Corrente</option>
+                    <option value="Poupança">🐷 Poupança</option>
+                    <option value="Investimento">📈 Investimentos</option>
+                    <option value="Carteira">💰 Carteira/Dinheiro</option>
+                </select>
+            </div>
+
+            <!-- Saldo Inicial -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Saldo Inicial (R$) *
+                </label>
+                <input type="number" name="initial_balance" id="edit_initial_balance" step="0.01" required
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-yellow-500 dark:bg-gray-700 dark:text-white">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    ⚠️ Alterar o saldo inicial recalculará o saldo atual da conta
+                </p>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex gap-3">
+                <button type="button" onclick="closeEditModal()" 
+                        class="flex-1 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-800 dark:text-white py-3 px-6 rounded-lg font-semibold transition duration-200">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white py-3 px-6 rounded-lg font-semibold transition duration-200">
+                    Salvar Alterações
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openAddModal() {
+    document.getElementById('addAccountModal').classList.remove('hidden');
+    document.getElementById('addAccountModal').classList.add('flex');
+}
+
+function closeAddModal() {
+    document.getElementById('addAccountModal').classList.add('hidden');
+    document.getElementById('addAccountModal').classList.remove('flex');
+}
+
+function openEditModal(accountId, name, type, initialBalance) {
+    document.getElementById('edit_account_id').value = accountId;
+    document.getElementById('edit_name').value = name;
+    document.getElementById('edit_type').value = type;
+    document.getElementById('edit_initial_balance').value = initialBalance;
+    document.getElementById('editAccountModal').classList.remove('hidden');
+    document.getElementById('editAccountModal').classList.add('flex');
+}
+
+function closeEditModal() {
+    document.getElementById('editAccountModal').classList.add('hidden');
+    document.getElementById('editAccountModal').classList.remove('flex');
+}
+
+function viewTransactions(accountId, accountName) {
+    // Redirecionar para página de transações filtrada por conta
+    window.location.href = `/dashboard?account_id=${accountId}`;
+}
+
+async function recalculateBalance(accountId, accountName) {
+    if (!confirm(`Deseja recalcular o saldo da conta "${accountName}"?\n\nIsso irá recalcular baseado no saldo inicial + transações pagas.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/accounts/${accountId}/recalculate`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`Saldo recalculado com sucesso!\n\nNovo saldo: R$ ${data.new_balance.toFixed(2)}`);
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.error || 'Falha ao recalcular saldo'));
+        }
+    } catch (error) {
+        alert('Erro ao processar requisição: ' + error.message);
+    }
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('addAccountModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeAddModal();
+    }
+});
+</script>
+{% endblock %}

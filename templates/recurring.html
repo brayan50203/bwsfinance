@@ -1,0 +1,733 @@
+{% extends "base.html" %}
+
+{% block title %}Transações Recorrentes - BWS Finance{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 flex items-center">
+                <span class="text-4xl mr-3">🔄</span>
+                Transações Recorrentes
+            </h1>
+            <p class="text-gray-600 mt-2">Gerencie suas receitas e despesas automáticas mensais</p>
+        </div>
+        <button id="btnAddRecurring" class="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-lg font-semibold hover:from-blue-700 hover:to-purple-700 transition shadow-lg">
+            ➕ Nova Recorrente
+        </button>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid md:grid-cols-4 gap-6 mb-8">
+        <div class="bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl p-6 text-white shadow-lg">
+            <div class="text-3xl mb-2">💰</div>
+            <div class="text-sm opacity-90">Receitas Recorrentes</div>
+            <div id="totalRecurringIncome" class="text-3xl font-bold mt-2">R$ 0,00</div>
+        </div>
+
+        <div class="bg-gradient-to-br from-red-500 to-pink-600 rounded-xl p-6 text-white shadow-lg">
+            <div class="text-3xl mb-2">💸</div>
+            <div class="text-sm opacity-90">Despesas Recorrentes</div>
+            <div id="totalRecurringExpenses" class="text-3xl font-bold mt-2">R$ 0,00</div>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg">
+            <div class="text-3xl mb-2">📊</div>
+            <div class="text-sm opacity-90">Saldo Previsto</div>
+            <div id="predictedBalance" class="text-3xl font-bold mt-2">R$ 0,00</div>
+        </div>
+
+        <div class="bg-gradient-to-br from-purple-500 to-violet-600 rounded-xl p-6 text-white shadow-lg">
+            <div class="text-3xl mb-2">🔢</div>
+            <div class="text-sm opacity-90">Total Ativas</div>
+            <div id="totalActive" class="text-3xl font-bold mt-2">0</div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white rounded-lg shadow-md p-4 mb-6">
+        <div class="flex flex-wrap gap-4">
+            <select id="filterType" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="">Todos os tipos</option>
+                <option value="Receita">💰 Receitas</option>
+                <option value="Despesa">💸 Despesas</option>
+            </select>
+
+            <select id="filterStatus" class="px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <option value="active">✅ Somente Ativas</option>
+                <option value="">Todas</option>
+                <option value="inactive">❌ Inativas</option>
+            </select>
+
+            <button id="btnApplyFilters" class="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition">
+                🔍 Filtrar
+            </button>
+        </div>
+    </div>
+
+    <!-- Lista de Recorrentes -->
+    <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                    <tr>
+                        <th class="px-6 py-4 text-left">Status</th>
+                        <th class="px-6 py-4 text-left">Descrição</th>
+                        <th class="px-6 py-4 text-left">Tipo</th>
+                        <th class="px-6 py-4 text-left">Categoria</th>
+                        <th class="px-6 py-4 text-right">Valor</th>
+                        <th class="px-6 py-4 text-left">Frequência</th>
+                        <th class="px-6 py-4 text-left">Próxima Exec.</th>
+                        <th class="px-6 py-4 text-center">Ações</th>
+                    </tr>
+                </thead>
+                <tbody id="recurringList" class="divide-y divide-gray-200">
+                    <tr>
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-400">
+                            <div class="text-5xl mb-3">🔄</div>
+                            <p class="text-lg">Carregando transações recorrentes...</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Adicionar/Editar Recorrente -->
+<div id="modalRecurring" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 text-white p-6 rounded-t-2xl">
+            <h2 id="modalTitle" class="text-2xl font-bold">➕ Nova Transação Recorrente</h2>
+        </div>
+
+        <form id="formRecurring" class="p-6 space-y-4">
+            <input type="hidden" id="recurring_id" name="recurring_id">
+
+            <!-- Tipo -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo *</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" onclick="selectType('Receita')" id="btnTypeReceita" class="px-4 py-3 border-2 rounded-lg hover:bg-green-50 transition">
+                        💰 Receita
+                    </button>
+                    <button type="button" onclick="selectType('Despesa')" id="btnTypeDespesa" class="px-4 py-3 border-2 rounded-lg hover:bg-red-50 transition">
+                        💸 Despesa
+                    </button>
+                </div>
+                <input type="hidden" id="type" name="type" required>
+            </div>
+
+            <!-- Descrição -->
+            <div>
+                <label for="description" class="block text-sm font-semibold text-gray-700 mb-2">Descrição *</label>
+                <input type="text" id="description" name="description" required 
+                       placeholder="Ex: Salário, Aluguel, Netflix..."
+                       class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Valor -->
+            <div>
+                <label for="value" class="block text-sm font-semibold text-gray-700 mb-2">Valor (R$) *</label>
+                <input type="number" id="value" name="value" step="0.01" required 
+                       placeholder="0,00"
+                       class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Categoria -->
+            <div>
+                <label for="category_id" class="block text-sm font-semibold text-gray-700 mb-2">Categoria *</label>
+                <select id="category_id" name="category_id" required 
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+
+            <!-- Tipo de Pagamento -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Tipo de Pagamento *</label>
+                <div class="grid grid-cols-2 gap-3">
+                    <button type="button" onclick="selectPaymentType('account')" id="btnPaymentAccount" class="px-4 py-3 border-2 border-blue-500 bg-blue-50 rounded-lg font-semibold transition">
+                        🏦 Conta
+                    </button>
+                    <button type="button" onclick="selectPaymentType('card')" id="btnPaymentCard" class="px-4 py-3 border-2 rounded-lg hover:bg-purple-50 transition">
+                        💳 Cartão
+                    </button>
+                </div>
+                <input type="hidden" id="payment_type" name="payment_type" value="account">
+            </div>
+
+            <!-- Conta -->
+            <div id="fieldAccount">
+                <label for="account_id" class="block text-sm font-semibold text-gray-700 mb-2">Conta *</label>
+                <select id="account_id" name="account_id" 
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+
+            <!-- Cartão de Crédito -->
+            <div id="fieldCard" class="hidden">
+                <label for="card_id" class="block text-sm font-semibold text-gray-700 mb-2">Cartão de Crédito *</label>
+                <select id="card_id" name="card_id" 
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="">Selecione...</option>
+                </select>
+            </div>
+
+            <!-- Frequência -->
+            <div>
+                <label for="frequency" class="block text-sm font-semibold text-gray-700 mb-2">Frequência *</label>
+                <select id="frequency" name="frequency" required onchange="updateFrequencyFields()"
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="monthly">📅 Mensal</option>
+                    <option value="weekly">📆 Semanal</option>
+                    <option value="yearly">🗓️ Anual</option>
+                </select>
+            </div>
+
+            <!-- Dia do mês (para mensal) -->
+            <div id="fieldDayOfMonth">
+                <label for="day_of_month" class="block text-sm font-semibold text-gray-700 mb-2">Dia do Mês *</label>
+                <input type="number" id="day_of_month" name="day_of_month" min="1" max="31" value="1"
+                       class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Dia da semana (para semanal) -->
+            <div id="fieldDayOfWeek" class="hidden">
+                <label for="day_of_week" class="block text-sm font-semibold text-gray-700 mb-2">Dia da Semana *</label>
+                <select id="day_of_week" name="day_of_week"
+                        class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                    <option value="1">Segunda-feira</option>
+                    <option value="2">Terça-feira</option>
+                    <option value="3">Quarta-feira</option>
+                    <option value="4">Quinta-feira</option>
+                    <option value="5">Sexta-feira</option>
+                    <option value="6">Sábado</option>
+                    <option value="0">Domingo</option>
+                </select>
+            </div>
+
+            <!-- Data de início -->
+            <div>
+                <label for="start_date" class="block text-sm font-semibold text-gray-700 mb-2">Data de Início *</label>
+                <input type="date" id="start_date" name="start_date" required 
+                       class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+            </div>
+
+            <!-- Data de fim (opcional) -->
+            <div>
+                <label for="end_date" class="block text-sm font-semibold text-gray-700 mb-2">Data de Término (Opcional)</label>
+                <input type="date" id="end_date" name="end_date" 
+                       class="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500">
+                <p class="text-xs text-gray-500 mt-1">Deixe em branco para recorrência indefinida</p>
+            </div>
+
+            <!-- Ativo -->
+            <div class="flex items-center space-x-3">
+                <input type="checkbox" id="active" name="active" checked 
+                       class="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500">
+                <label for="active" class="text-sm font-semibold text-gray-700">✅ Transação Ativa</label>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex gap-3 pt-4">
+                <button type="submit" class="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 rounded-lg font-bold hover:from-blue-700 hover:to-purple-700 transition">
+                    💾 Salvar
+                </button>
+                <button type="button" onclick="closeModal()" class="px-6 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition">
+                    ❌ Cancelar
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+let accounts = [];
+let cards = [];
+let categories = [];
+let recurrings = [];
+
+// ============================================
+// INICIALIZAÇÃO
+// ============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadAccounts();
+    loadCards();
+    loadCategories();
+    loadRecurrings();
+
+    // Event Listeners
+    document.getElementById('btnAddRecurring').addEventListener('click', openModalAdd);
+    document.getElementById('formRecurring').addEventListener('submit', handleSubmit);
+    document.getElementById('btnApplyFilters').addEventListener('click', loadRecurrings);
+
+    // Set data mínima para hoje
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('start_date').value = today;
+});
+
+// ============================================
+// CARREGAR DADOS
+// ============================================
+
+async function loadAccounts() {
+    try {
+        const response = await fetch('/api/accounts');
+        const data = await response.json();
+        
+        // A API retorna array direto, não objeto com success
+        if (Array.isArray(data)) {
+            accounts = data;
+        } else if (data.success && data.accounts) {
+            accounts = data.accounts;
+        } else {
+            accounts = [];
+        }
+        
+        console.log('✅ Contas carregadas:', accounts.length);
+        
+        const select = document.getElementById('account_id');
+        select.innerHTML = '<option value="">Selecione...</option>';
+        accounts.forEach(acc => {
+            const icon = acc.type === 'Corrente' ? '🏦' : acc.type === 'Poupança' ? '💰' : '💵';
+            const balance = acc.current_balance || acc.balance || 0;
+            select.innerHTML += `<option value="${acc.id}">${icon} ${acc.name} - R$ ${formatBRL(balance)}</option>`;
+        });
+    } catch (error) {
+        console.error('❌ Erro ao carregar contas:', error);
+    }
+}
+
+async function loadCards() {
+    try {
+        const response = await fetch('/api/cards');
+        const data = await response.json();
+        
+        if (data.success && data.cards) {
+            cards = data.cards;
+        } else if (Array.isArray(data)) {
+            cards = data;
+        } else {
+            cards = [];
+        }
+        
+        console.log('✅ Cartões carregados:', cards.length);
+        
+        const select = document.getElementById('card_id');
+        select.innerHTML = '<option value="">Selecione...</option>';
+        cards.forEach(card => {
+            const available = (card.limit || card.available_limit || 0) - (card.used_limit || 0);
+            select.innerHTML += `<option value="${card.id}">💳 ${card.name} - Disponível: R$ ${formatBRL(available)}</option>`;
+        });
+    } catch (error) {
+        console.error('❌ Erro ao carregar cartões:', error);
+    }
+}
+
+async function loadCategories() {
+    try {
+        const response = await fetch('/api/categories');
+        const data = await response.json();
+        
+        if (data.success && data.categories) {
+            categories = data.categories;
+        } else if (Array.isArray(data)) {
+            categories = data;
+        } else {
+            categories = [];
+        }
+        
+        console.log('✅ Categorias carregadas:', categories.length);
+        
+        // Se não houver categorias, criar padrões
+        if (categories.length === 0) {
+            console.warn('⚠️ Nenhuma categoria encontrada, usando padrões');
+            categories = getDefaultCategories();
+        }
+    } catch (error) {
+        console.error('❌ Erro ao carregar categorias:', error);
+        categories = getDefaultCategories();
+    }
+}
+
+function getDefaultCategories() {
+    return [
+        // Receitas
+        { id: 'cat-receita-1', name: 'Salário', type: 'Receita', icon: '💼' },
+        { id: 'cat-receita-2', name: 'Freelance', type: 'Receita', icon: '💻' },
+        { id: 'cat-receita-3', name: 'Investimentos', type: 'Receita', icon: '📈' },
+        { id: 'cat-receita-4', name: 'Outros', type: 'Receita', icon: '💰' },
+        
+        // Despesas
+        { id: 'cat-despesa-1', name: 'Alimentação', type: 'Despesa', icon: '🍔' },
+        { id: 'cat-despesa-2', name: 'Transporte', type: 'Despesa', icon: '🚗' },
+        { id: 'cat-despesa-3', name: 'Moradia', type: 'Despesa', icon: '🏠' },
+        { id: 'cat-despesa-4', name: 'Saúde', type: 'Despesa', icon: '🏥' },
+        { id: 'cat-despesa-5', name: 'Educação', type: 'Despesa', icon: '📚' },
+        { id: 'cat-despesa-6', name: 'Lazer', type: 'Despesa', icon: '🎮' },
+        { id: 'cat-despesa-7', name: 'Compras', type: 'Despesa', icon: '🛒' },
+        { id: 'cat-despesa-8', name: 'Contas', type: 'Despesa', icon: '📄' },
+        { id: 'cat-despesa-9', name: 'Outros', type: 'Despesa', icon: '💸' }
+    ];
+}
+
+async function loadRecurrings() {
+    const typeFilter = document.getElementById('filterType').value;
+    const statusFilter = document.getElementById('filterStatus').value;
+    
+    let url = '/api/recurring?';
+    if (typeFilter) url += `type=${typeFilter}&`;
+    if (statusFilter) url += `status=${statusFilter}`;
+
+    try {
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success) {
+            recurrings = data.data;
+            renderRecurrings();
+            updateStats();
+        }
+    } catch (error) {
+        console.error('Erro ao carregar recorrentes:', error);
+        showError('Erro ao carregar transações recorrentes');
+    }
+}
+
+function renderRecurrings() {
+    const tbody = document.getElementById('recurringList');
+    
+    if (recurrings.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="px-6 py-12 text-center text-gray-400">
+                    <div class="text-5xl mb-3">📭</div>
+                    <p class="text-lg">Nenhuma transação recorrente cadastrada</p>
+                    <button onclick="openModalAdd()" class="mt-4 text-blue-600 hover:text-blue-700 font-semibold">
+                        ➕ Adicionar primeira recorrente
+                    </button>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = recurrings.map(r => `
+        <tr class="hover:bg-gray-50 ${!r.active ? 'opacity-50' : ''}">
+            <td class="px-6 py-4">
+                ${r.active ? '<span class="text-green-600 text-2xl">✅</span>' : '<span class="text-gray-400 text-2xl">⏸️</span>'}
+            </td>
+            <td class="px-6 py-4">
+                <div class="font-semibold text-gray-800">${r.description}</div>
+            </td>
+            <td class="px-6 py-4">
+                <span class="px-3 py-1 rounded-full text-sm font-semibold ${r.type === 'Receita' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                    ${r.type === 'Receita' ? '💰' : '💸'} ${r.type}
+                </span>
+            </td>
+            <td class="px-6 py-4">
+                <span class="text-2xl">${r.category_icon || '📁'}</span>
+                <span class="ml-2 text-sm text-gray-600">${r.category_name || '-'}</span>
+            </td>
+            <td class="px-6 py-4 text-right">
+                <span class="font-bold ${r.type === 'Receita' ? 'text-green-600' : 'text-red-600'}">
+                    R$ ${formatBRL(r.value)}
+                </span>
+            </td>
+            <td class="px-6 py-4">
+                <span class="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm">
+                    ${formatFrequency(r.frequency)}
+                </span>
+            </td>
+            <td class="px-6 py-4">
+                ${formatDate(r.next_execution)}
+            </td>
+            <td class="px-6 py-4 text-center">
+                <button onclick="editRecurring('${r.id}')" class="text-blue-600 hover:text-blue-800 mr-3" title="Editar">
+                    ✏️
+                </button>
+                <button onclick="toggleActive('${r.id}', ${!r.active})" class="text-yellow-600 hover:text-yellow-800 mr-3" title="${r.active ? 'Desativar' : 'Ativar'}">
+                    ${r.active ? '⏸️' : '▶️'}
+                </button>
+                <button onclick="deleteRecurring('${r.id}')" class="text-red-600 hover:text-red-800" title="Excluir">
+                    🗑️
+                </button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function updateStats() {
+    const activeRecurrings = recurrings.filter(r => r.active);
+    
+    const totalIncome = activeRecurrings
+        .filter(r => r.type === 'Receita')
+        .reduce((sum, r) => sum + parseFloat(r.value), 0);
+    
+    const totalExpenses = activeRecurrings
+        .filter(r => r.type === 'Despesa')
+        .reduce((sum, r) => sum + parseFloat(r.value), 0);
+    
+    const balance = totalIncome - totalExpenses;
+
+    document.getElementById('totalRecurringIncome').textContent = 'R$ ' + formatBRL(totalIncome);
+    document.getElementById('totalRecurringExpenses').textContent = 'R$ ' + formatBRL(totalExpenses);
+    document.getElementById('predictedBalance').textContent = 'R$ ' + formatBRL(balance);
+    document.getElementById('predictedBalance').className = `text-3xl font-bold mt-2 ${balance >= 0 ? 'text-white' : 'text-red-200'}`;
+    document.getElementById('totalActive').textContent = activeRecurrings.length;
+}
+
+// ============================================
+// MODAL
+// ============================================
+
+function openModalAdd() {
+    document.getElementById('modalTitle').textContent = '➕ Nova Transação Recorrente';
+    document.getElementById('formRecurring').reset();
+    document.getElementById('recurring_id').value = '';
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('start_date').value = today;
+    document.getElementById('active').checked = true;
+    selectPaymentType('account'); // Inicializar como conta
+    updateFrequencyFields();
+    document.getElementById('modalRecurring').classList.remove('hidden');
+}
+
+async function editRecurring(id) {
+    const recurring = recurrings.find(r => r.id === id);
+    if (!recurring) return;
+
+    document.getElementById('modalTitle').textContent = '✏️ Editar Transação Recorrente';
+    document.getElementById('recurring_id').value = recurring.id;
+    document.getElementById('description').value = recurring.description;
+    document.getElementById('value').value = recurring.value;
+    document.getElementById('category_id').value = recurring.category_id;
+    document.getElementById('frequency').value = recurring.frequency;
+    document.getElementById('day_of_month').value = recurring.day_of_month || 1;
+    document.getElementById('day_of_week').value = recurring.day_of_week || 1;
+    document.getElementById('start_date').value = recurring.start_date;
+    document.getElementById('end_date').value = recurring.end_date || '';
+    document.getElementById('active').checked = recurring.active === 1;
+
+    // Determinar tipo de pagamento
+    if (recurring.card_id) {
+        selectPaymentType('card');
+        document.getElementById('card_id').value = recurring.card_id;
+    } else {
+        selectPaymentType('account');
+        document.getElementById('account_id').value = recurring.account_id;
+    }
+
+    selectType(recurring.type);
+    updateCategoryOptions(recurring.type);
+    updateFrequencyFields();
+
+    document.getElementById('modalRecurring').classList.remove('hidden');
+}
+
+function closeModal() {
+    document.getElementById('modalRecurring').classList.add('hidden');
+}
+
+function selectType(type) {
+    document.getElementById('type').value = type;
+    
+    const btnReceita = document.getElementById('btnTypeReceita');
+    const btnDespesa = document.getElementById('btnTypeDespesa');
+    
+    if (type === 'Receita') {
+        btnReceita.className = 'px-4 py-3 border-2 border-green-500 bg-green-50 rounded-lg font-semibold';
+        btnDespesa.className = 'px-4 py-3 border-2 rounded-lg hover:bg-red-50 transition';
+    } else {
+        btnDespesa.className = 'px-4 py-3 border-2 border-red-500 bg-red-50 rounded-lg font-semibold';
+        btnReceita.className = 'px-4 py-3 border-2 rounded-lg hover:bg-green-50 transition';
+    }
+
+    updateCategoryOptions(type);
+}
+
+function selectPaymentType(paymentType) {
+    document.getElementById('payment_type').value = paymentType;
+    
+    const btnAccount = document.getElementById('btnPaymentAccount');
+    const btnCard = document.getElementById('btnPaymentCard');
+    const fieldAccount = document.getElementById('fieldAccount');
+    const fieldCard = document.getElementById('fieldCard');
+    const accountSelect = document.getElementById('account_id');
+    const cardSelect = document.getElementById('card_id');
+    
+    if (paymentType === 'account') {
+        btnAccount.className = 'px-4 py-3 border-2 border-blue-500 bg-blue-50 rounded-lg font-semibold transition';
+        btnCard.className = 'px-4 py-3 border-2 rounded-lg hover:bg-purple-50 transition';
+        fieldAccount.classList.remove('hidden');
+        fieldCard.classList.add('hidden');
+        accountSelect.required = true;
+        cardSelect.required = false;
+        cardSelect.value = '';
+    } else {
+        btnCard.className = 'px-4 py-3 border-2 border-purple-500 bg-purple-50 rounded-lg font-semibold transition';
+        btnAccount.className = 'px-4 py-3 border-2 rounded-lg hover:bg-blue-50 transition';
+        fieldCard.classList.remove('hidden');
+        fieldAccount.classList.add('hidden');
+        cardSelect.required = true;
+        accountSelect.required = false;
+        accountSelect.value = '';
+    }
+}
+
+function updateCategoryOptions(type) {
+    const select = document.getElementById('category_id');
+    const filtered = categories.filter(c => c.type === type);
+    
+    select.innerHTML = '<option value="">Selecione...</option>';
+    filtered.forEach(cat => {
+        select.innerHTML += `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`;
+    });
+}
+
+function updateFrequencyFields() {
+    const frequency = document.getElementById('frequency').value;
+    const fieldDay = document.getElementById('fieldDayOfMonth');
+    const fieldWeek = document.getElementById('fieldDayOfWeek');
+
+    if (frequency === 'weekly') {
+        fieldDay.classList.add('hidden');
+        fieldWeek.classList.remove('hidden');
+    } else {
+        fieldDay.classList.remove('hidden');
+        fieldWeek.classList.add('hidden');
+    }
+}
+
+// ============================================
+// CRUD ACTIONS
+// ============================================
+
+async function handleSubmit(e) {
+    e.preventDefault();
+
+    const recurringId = document.getElementById('recurring_id').value;
+    const isEdit = !!recurringId;
+    const paymentType = document.getElementById('payment_type').value;
+
+    const data = {
+        description: document.getElementById('description').value,
+        type: document.getElementById('type').value,
+        value: parseFloat(document.getElementById('value').value),
+        category_id: document.getElementById('category_id').value,
+        account_id: paymentType === 'account' ? document.getElementById('account_id').value : null,
+        card_id: paymentType === 'card' ? document.getElementById('card_id').value : null,
+        frequency: document.getElementById('frequency').value,
+        day_of_month: parseInt(document.getElementById('day_of_month').value) || null,
+        day_of_week: parseInt(document.getElementById('day_of_week').value) || null,
+        start_date: document.getElementById('start_date').value,
+        end_date: document.getElementById('end_date').value || null,
+        active: document.getElementById('active').checked
+    };
+
+    try {
+        const url = isEdit ? `/api/recurring/${recurringId}` : '/api/recurring';
+        const method = isEdit ? 'PUT' : 'POST';
+
+        const response = await fetch(url, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSuccess(isEdit ? 'Recorrente atualizada!' : 'Recorrente criada!');
+            closeModal();
+            loadRecurrings();
+        } else {
+            showError(result.error || 'Erro ao salvar');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        showError('Erro ao salvar transação recorrente');
+    }
+}
+
+async function toggleActive(id, active) {
+    try {
+        const response = await fetch(`/api/recurring/${id}/toggle`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ active: active })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSuccess(active ? 'Recorrente ativada!' : 'Recorrente desativada!');
+            loadRecurrings();
+        } else {
+            showError(result.error || 'Erro ao alterar status');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        showError('Erro ao alterar status');
+    }
+}
+
+async function deleteRecurring(id) {
+    if (!confirm('Tem certeza que deseja excluir esta transação recorrente?')) return;
+
+    try {
+        const response = await fetch(`/api/recurring/${id}`, {
+            method: 'DELETE'
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            showSuccess('Recorrente excluída!');
+            loadRecurrings();
+        } else {
+            showError(result.error || 'Erro ao excluir');
+        }
+    } catch (error) {
+        console.error('Erro:', error);
+        showError('Erro ao excluir transação recorrente');
+    }
+}
+
+// ============================================
+// HELPERS
+// ============================================
+
+function formatBRL(value) {
+    return parseFloat(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '-';
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('pt-BR');
+}
+
+function formatFrequency(freq) {
+    const map = {
+        'monthly': '📅 Mensal',
+        'weekly': '📆 Semanal',
+        'yearly': '🗓️ Anual'
+    };
+    return map[freq] || freq;
+}
+
+function showSuccess(message) {
+    alert('✅ ' + message);
+}
+
+function showError(message) {
+    alert('❌ ' + message);
+}
+</script>
+
+{% endblock %}

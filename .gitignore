@@ -1,0 +1,79 @@
+# === Python ===
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+.venv/
+.env/
+ENV/
+
+# === Flask specific ===
+instance/
+*.pid
+
+# === Databases ===
+*.sqlite3
+*.db
+bws_finance.db
+backup_*.db
+
+# === Logs ===
+logs/
+*.log
+
+# === Frontend (Vite / Node) ===
+frontend/node_modules/
+frontend/.vite/
+frontend/dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# === Cache & coverage ===
+.cache/
+coverage/
+.coverage
+.pytest_cache/
+
+# === Tokens / sessions / temp ===
+tokens/
+whatsapp/
+whatsapp-sessions/
+*.session
+.temp/
+
+# === Editor / OS ===
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+.DS_Store
+
+# === Security / secrets ===
+.env.local
+.env.production
+.env.development
+.env.test
+
+# === Build artifacts ===
+build/
+dist/
+*.bak
+
+# === Generated static ===
+static/js/*.map
+static/css/*.map
+
+# === Misc ===
+*.tgz
+*.tar.gz

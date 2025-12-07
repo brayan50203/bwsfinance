@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # Nginx Reverse Proxy (Entrada de todas aplicações)
+  nginx:
+    image: nginx:alpine
+    container_name: bws-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    networks:
+      - bws-network
+    depends_on:
+      - bws-backend
+      - whatsapp-server
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # BWS Finance Backend (Flask + AI + Scheduler)
+  bws-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bws-finance-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./bws_finance.db:/app/bws_finance.db
+      - ./logs:/app/logs
+      - ./temp:/app/temp
+      - ./static/uploads:/app/static/uploads
+    environment:
+      # Flask
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - FLASK_HOST=0.0.0.0
+      - FLASK_PORT=5000
+      - SECRET_KEY=${SECRET_KEY:-change-this-in-production}
+      
+      # WhatsApp
+      - WHATSAPP_SERVER_URL=http://whatsapp-server:3000
+      - WHATSAPP_AUTH_TOKEN=${WHATSAPP_AUTH_TOKEN:-default-token}
+      - WHATSAPP_ENABLED=true
+      - WHATSAPP_SESSION_NAME=bws-finance
+      
+      # Email SMTP
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER}
+      - SMTP_PASSWORD=${SMTP_PASSWORD}
+      - SMTP_FROM=${SMTP_FROM:-noreply@bwsfinance.com}
+      
+      # Notificações
+      - AUTO_NOTIFICATIONS_ENABLED=${AUTO_NOTIFICATIONS_ENABLED:-true}
+      - NOTIFY_DEFAULT_LOW_BALANCE=${NOTIFY_DEFAULT_LOW_BALANCE:-100.00}
+      - NOTIFY_INVEST_PCT=${NOTIFY_INVEST_PCT:-3.0}
+      
+      # AI/ML (opcional)
+      - WHISPER_MODEL=tiny
+      - WHISPER_LANGUAGE=pt
+      - TESSERACT_LANG=por
+      
+    networks:
+      - bws-network
+    depends_on:
+      - whatsapp-server
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/notifications/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # WhatsApp Server (Node.js + WPPConnect)
+  whatsapp-server:
+    build:
+      context: ./whatsapp_server
+      dockerfile: Dockerfile
+    container_name: bws-whatsapp-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./whatsapp_server/tokens:/app/tokens
+    environment:
+      - PORT=3000
+      - FLASK_URL=http://bws-backend:5000
+      - WHATSAPP_AUTH_TOKEN=${WHATSAPP_AUTH_TOKEN:-bws_finance_token_55653}
+      - SESSION_NAME=bws-finance
+      - NODE_ENV=production
+    networks:
+      - bws-network
+    depends_on:
+      - bws-backend
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  bws-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+
+volumes:
+  bws_data:
+  bws_logs:
+  whatsapp_tokens:

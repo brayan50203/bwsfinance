@@ -1,0 +1,34 @@
+# Dockerfile - WhatsApp Server
+FROM node:20-slim
+
+# Instalar dependências do sistema (Chrome/Chromium para WPPConnect)
+RUN apt-get update && apt-get install -y \
+    chromium \
+    fonts-liberation \
+    libnss3 \
+    libxss1 \
+    libasound2 \
+    libatk-bridge2.0-0 \
+    libgtk-3-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Diretório de trabalho
+WORKDIR /app
+
+# Copiar package.json
+COPY whatsapp_server/package*.json ./
+
+# Instalar dependências Node.js
+RUN npm ci --only=production
+
+# Copiar código
+COPY whatsapp_server/ .
+
+# Criar diretórios
+RUN mkdir -p tokens
+
+# Expor porta
+EXPOSE 3000
+
+# Comando de inicialização
+CMD ["node", "index.js"]

@@ -1,0 +1,1246 @@
+﻿"""
+BWS Finance - Backend Flask
+Base: nik0finance
+Melhorado com: Multi-tenant, Contas, Cartões, Parcelamentos, Recorrências
+"""
+
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, flash
+from werkzeug.security import generate_password_hash, check_password_hash
+from datetime import datetime, timedelta
+from functools import wraps
+import sqlite3
+import uuid
+import os
+import requests
+import re
+from dotenv import load_dotenv
+
+# Importar serviços de investimentos
+from services.api_connectors import InvestmentAPIFactory
+from services.investment_calculator import InvestmentCalculator
+from services.investment_ai_advisor import InvestmentAIAdvisor
+from utils.formatters import format_brl
+
+load_dotenv()
+
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
+app.config['DATABASE'] = 'bws_finance.db'
+
+# Registrar filtro customizado BRL
+app.jinja_env.filters['brl'] = format_brl
+
+# Registrar blueprints de API
+from routes.accounts import accounts_bp
+from routes.recurring import recurring_bp
+from routes.installments import installments_bp
+from routes.investments import investments_bp
+app.register_blueprint(accounts_bp)
+app.register_blueprint(recurring_bp)
+app.register_blueprint(installments_bp)
+app.register_blueprint(investments_bp)
+
+# =====================================================
+# DATABASE HELPERS
+# =====================================================
+
+def get_db():
+    """Conecta ao banco de dados SQLite"""
+    db = sqlite3.connect(app.config['DATABASE'], timeout=30.0, check_same_thread=False)
+    db.row_factory = sqlite3.Row
+    db.execute('PRAGMA journal_mode=WAL')  # Write-Ahead Logging para melhor concorrência
+    return db
+
+def init_db():
+    """Inicializa o banco de dados com o schema"""
+    with app.app_context():
+        db = get_db()
+        with open('database_schema.sql', 'r', encoding='utf-8') as f:
+            db.executescript(f.read())
+        db.commit()
+        db.close()
+        print("✅ Database initialized!")
+
+def seed_default_data():
+    """Popula dados iniciais (tenant padrão, categorias padrão)"""
+    db = get_db()
+    
+    # Tenant padrão
+    tenant_id = str(uuid.uuid4())
+    db.execute(
+        "INSERT OR IGNORE INTO tenants (id, name, subdomain) VALUES (?, ?, ?)",
+        (tenant_id, 'BWS Finance', 'default')
+    )
+    
+    # Categorias padrão
+    default_categories = [
+        # Receitas
+        (str(uuid.uuid4()), tenant_id, 'Salário', 'Receita', '💼', '#10b981'),
+        (str(uuid.uuid4()), tenant_id, 'Freelance', 'Receita', '💻', '#3b82f6'),
+        (str(uuid.uuid4()), tenant_id, 'Investimentos', 'Receita', '📈', '#8b5cf6'),
+        (str(uuid.uuid4()), tenant_id, 'Outros', 'Receita', '💰', '#6b7280'),
+        # Despesas
+        (str(uuid.uuid4()), tenant_id, 'Alimentação', 'Despesa', '🍔', '#ef4444'),
+        (str(uuid.uuid4()), tenant_id, 'Transporte', 'Despesa', '🚗', '#f59e0b'),
+        (str(uuid.uuid4()), tenant_id, 'Moradia', 'Despesa', '🏠', '#ec4899'),
+        (str(uuid.uuid4()), tenant_id, 'Saúde', 'Despesa', '🏥', '#14b8a6'),
+        (str(uuid.uuid4()), tenant_id, 'Educação', 'Despesa', '📚', '#6366f1'),
+        (str(uuid.uuid4()), tenant_id, 'Lazer', 'Despesa', '🎮', '#a855f7'),
+        (str(uuid.uuid4()), tenant_id, 'Outros', 'Despesa', '🛒', '#6b7280'),
+    ]
+    
+    for cat in default_categories:
+        db.execute(
+            "INSERT OR IGNORE INTO categories (id, tenant_id, name, type, icon, color) VALUES (?, ?, ?, ?, ?, ?)",
+            cat
+        )
+    
+    db.commit()
+    db.close()
+    print("✅ Default data seeded!")
+
+# =====================================================
+# AUTHENTICATION DECORATORS
+# =====================================================
+
+def login_required(f):
+    """Decorator para rotas que requerem autenticação"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            flash('Você precisa fazer login primeiro', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_user():
+    """Retorna dados do usuário atual"""
+    if 'user_id' not in session:
+        return None
+    
+    db = get_db()
+    user = db.execute(
+        "SELECT id, tenant_id, email, name, is_admin FROM users WHERE id = ?",
+        (session['user_id'],)
+    ).fetchone()
+    db.close()
+    
+    return dict(user) if user else None
+
+# =====================================================
+# AUTHENTICATION ROUTES
+# =====================================================
+
+@app.route('/')
+def index():
+    """Página inicial"""
+    if 'user_id' in session:
+        return redirect(url_for('dashboard'))
+    return redirect(url_for('login'))
+
+@app.route('/test')
+def test_page():
+    """Página de teste do sistema"""
+    return render_template('test_page.html')
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    """Login de usuário"""
+    if request.method == 'POST':
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        db = get_db()
+        user = db.execute(
+            "SELECT * FROM users WHERE email = ? AND active = 1",
+            (email,)
+        ).fetchone()
+        db.close()
+        
+        if user and check_password_hash(user['password_hash'], password):
+            session['user_id'] = user['id']
+            session['tenant_id'] = user['tenant_id']
+            session['user_name'] = user['name']
+            session['is_admin'] = user['is_admin']
+            flash(f'Bem-vindo(a), {user["name"]}!', 'success')
+            return redirect(url_for('dashboard'))
+        else:
+            flash('Email ou senha incorretos', 'error')
+    
+    return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    """Cadastro de novo usuário"""
+    if request.method == 'POST':
+        name = request.form.get('name')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        
+        db = get_db()
+        
+        # Verificar se email já existe
+        existing = db.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+        if existing:
+            flash('Este email já está cadastrado', 'error')
+            return render_template('register.html')
+        
+        # Pegar tenant padrão
+        tenant = db.execute("SELECT id FROM tenants WHERE subdomain = 'default'").fetchone()
+        tenant_id = tenant['id'] if tenant else str(uuid.uuid4())
+        
+        # Criar usuário
+        user_id = str(uuid.uuid4())
+        password_hash = generate_password_hash(password)
+        
+        db.execute(
+            "INSERT INTO users (id, tenant_id, email, password_hash, name) VALUES (?, ?, ?, ?, ?)",
+            (user_id, tenant_id, email, password_hash, name)
+        )
+        
+        # Criar conta padrão
+        account_id = str(uuid.uuid4())
+        db.execute(
+            "INSERT INTO accounts (id, user_id, tenant_id, name, type, initial_balance) VALUES (?, ?, ?, ?, ?, ?)",
+            (account_id, user_id, tenant_id, 'Conta Principal', 'Corrente', 0)
+        )
+        
+        db.commit()
+        db.close()
+        
+        flash('Cadastro realizado com sucesso! Faça login.', 'success')
+        return redirect(url_for('login'))
+    
+    return render_template('register.html')
+
+@app.route('/logout')
+def logout():
+    """Logout do usuário"""
+    session.clear()
+    flash('Você saiu da sua conta', 'info')
+    return redirect(url_for('login'))
+
+# =====================================================
+# DASHBOARD
+# =====================================================
+
+@app.route('/dashboard')
+@login_required
+def dashboard():
+    """Dashboard principal (estilo nik0finance melhorado)"""
+    user = get_current_user()
+    db = get_db()
+    
+    # Filtros
+    year = request.args.get('year', datetime.now().year, type=int)
+    month = request.args.get('month', datetime.now().month, type=int)
+    
+    # Resumo financeiro
+    summary = db.execute("""
+        SELECT 
+            COALESCE(SUM(CASE WHEN type = 'Receita' AND is_fixed = 1 THEN value ELSE 0 END), 0) as renda_fixa,
+            COALESCE(SUM(CASE WHEN type = 'Receita' AND is_fixed = 0 THEN value ELSE 0 END), 0) as renda_variavel,
+            COALESCE(SUM(CASE WHEN type = 'Receita' THEN value ELSE 0 END), 0) as renda_total,
+            COALESCE(SUM(CASE WHEN type = 'Despesa' AND is_fixed = 1 THEN value ELSE 0 END), 0) as custo_fixo,
+            COALESCE(SUM(CASE WHEN type = 'Despesa' AND is_fixed = 0 THEN value ELSE 0 END), 0) as custo_variavel,
+            COALESCE(SUM(CASE WHEN type = 'Despesa' THEN value ELSE 0 END), 0) as custo_total
+        FROM transactions
+        WHERE user_id = ? AND tenant_id = ? AND status = 'Pago'
+        AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
+    """, (user['id'], user['tenant_id'], str(year), f"{month:02d}")).fetchone()
+    
+    summary_dict = dict(summary) if summary else {
+        'renda_fixa': 0, 'renda_variavel': 0, 'renda_total': 0,
+        'custo_fixo': 0, 'custo_variavel': 0, 'custo_total': 0,
+        'saldo_mensal': 0
+    }
+    if summary:
+        summary_dict['saldo_mensal'] = summary_dict['renda_total'] - summary_dict['custo_total']
+    
+    # Transações de receita
+    rendas = db.execute("""
+        SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color,
+               a.name as account_name
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN accounts a ON t.account_id = a.id
+        WHERE t.user_id = ? AND t.tenant_id = ? AND t.type = 'Receita'
+        AND strftime('%Y', t.date) = ? AND strftime('%m', t.date) = ?
+        ORDER BY t.date DESC
+    """, (user['id'], user['tenant_id'], str(year), f"{month:02d}")).fetchall()
+    
+    # Transações de despesa
+    custos = db.execute("""
+        SELECT t.*, c.name as category_name, c.icon as category_icon, c.color as category_color,
+               a.name as account_name, card.name as card_name
+        FROM transactions t
+        LEFT JOIN categories c ON t.category_id = c.id
+        LEFT JOIN accounts a ON t.account_id = a.id
+        LEFT JOIN cards card ON t.card_id = card.id
+        WHERE t.user_id = ? AND t.tenant_id = ? AND t.type = 'Despesa'
+        AND strftime('%Y', t.date) = ? AND strftime('%m', t.date) = ?
+        ORDER BY t.date DESC
+    """, (user['id'], user['tenant_id'], str(year), f"{month:02d}")).fetchall()
+    
+    # Períodos disponíveis para filtro
+    periods = db.execute("""
+        SELECT DISTINCT strftime('%Y', date) as year, strftime('%m', date) as month
+        FROM transactions
+        WHERE user_id = ? AND tenant_id = ?
+        ORDER BY year DESC, month DESC
+    """, (user['id'], user['tenant_id'])).fetchall()
+    
+    # Saldos das contas
+    accounts = db.execute("""
+        SELECT * FROM v_account_balances
+        WHERE user_id = ? AND tenant_id = ?
+    """, (user['id'], user['tenant_id'])).fetchall()
+    
+    # Próximas parcelas a vencer (próximos 30 dias)
+    upcoming_installments = []
+    
+    # Resumo de Investimentos
+    investments_summary = db.execute("""
+        SELECT 
+            COUNT(*) as total_investments,
+            COALESCE(SUM(amount), 0) as total_invested,
+            COALESCE(SUM(current_value), 0) as total_current,
+            MAX(created_at) as last_update
+        FROM investments
+        WHERE user_id = ? AND tenant_id = ?
+    """, (user['id'], user['tenant_id'])).fetchone()
+    
+    inv_summary = {
+        'total_investments': 0,
+        'total_invested': 0,
+        'total_current': 0,
+        'profit_loss': 0,
+        'profit_percent': 0,
+        'last_update': None
+    }
+    
+    if investments_summary and investments_summary['total_investments'] > 0:
+        inv_summary = dict(investments_summary)
+        inv_summary['profit_loss'] = inv_summary['total_current'] - inv_summary['total_invested']
+        inv_summary['profit_percent'] = (inv_summary['profit_loss'] / inv_summary['total_invested'] * 100) if inv_summary['total_invested'] > 0 else 0
+    
+    db.close()
+    
+    return render_template('dashboard.html',
+                         user=user,
+                         summary=summary_dict,
+                         rendas=[dict(r) for r in rendas],
+                         custos=[dict(c) for c in custos],
+                         periods=[dict(p) for p in periods],
+                         accounts=[dict(a) for a in accounts],
+                         upcoming_installments=upcoming_installments,
+                         investments_summary=inv_summary,
+                         current_year=year,
+                         current_month=month)
+
+# =====================================================
+# ACCOUNTS (CONTAS BANCÁRIAS)
+# =====================================================
+
+@app.route('/accounts')
+@login_required
+def accounts():
+    """Lista todas as contas"""
+    user = get_current_user()
+    db = get_db()
+    
+    accounts = db.execute("""
+        SELECT * FROM v_account_balances
+        WHERE user_id = ? AND tenant_id = ?
+        ORDER BY name ASC
+    """, (user['id'], user['tenant_id'])).fetchall()
+    
+
+    # Calcular saldo total de todas as contas
+    total_balance = sum(float(a['balance']) if a['balance'] else 0 for a in accounts)
+    db.close()
+    
+    return render_template('accounts.html',
+                         accounts=[dict(a) for a in accounts],
+                         total_balance=total_balance)
+
+@app.route('/accounts/add', methods=['POST'])
+@login_required
+def add_account():
+    """Adiciona nova conta"""
+    user = get_current_user()
+    
+    name = request.form.get('name')
+    acc_type = request.form.get('type', 'Corrente')
+    bank = request.form.get('bank')
+    initial_balance = float(request.form.get('initial_balance', 0))
+    
+    db = get_db()
+    account_id = str(uuid.uuid4())
+    
+    db.execute("""
+        INSERT INTO accounts (id, user_id, tenant_id, name, type, bank, initial_balance, current_balance)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (account_id, user['id'], user['tenant_id'], name, acc_type, bank, initial_balance, initial_balance))
+    
+    db.commit()
+    db.close()
+    
+    flash(f'Conta "{name}" criada com sucesso!', 'success')
+    return redirect(url_for('accounts'))
+
+@app.route('/accounts/edit', methods=['POST'])
+@login_required
+def edit_account():
+    """Edita uma conta existente"""
+    user = get_current_user()
+    
+    account_id = request.form.get('account_id')
+    name = request.form.get('name')
+    acc_type = request.form.get('type')
+    initial_balance = float(request.form.get('initial_balance', 0))
+    
+    db = get_db()
+    
+    # Obter saldo inicial antigo para recalcular
+    old_account = db.execute("""
+        SELECT initial_balance, current_balance FROM accounts 
+        WHERE id = ? AND user_id = ?
+    """, (account_id, user['id'])).fetchone()
+    
+    if old_account:
+        # Calcular a diferença e ajustar o saldo atual
+        balance_diff = initial_balance - old_account['initial_balance']
+        new_current_balance = old_account['current_balance'] + balance_diff
+        
+        db.execute("""
+            UPDATE accounts 
+            SET name = ?, type = ?, initial_balance = ?, current_balance = ?
+            WHERE id = ? AND user_id = ?
+        """, (name, acc_type, initial_balance, new_current_balance, account_id, user['id']))
+        
+        db.commit()
+        flash(f'Conta "{name}" atualizada com sucesso!', 'success')
+    else:
+        flash('Conta não encontrada!', 'error')
+    
+    db.close()
+    return redirect(url_for('accounts'))
+
+# =====================================================
+# CARDS (CARTÕES DE CRÉDITO)
+# =====================================================
+
+@app.route('/cards')
+@login_required
+def cards():
+    """Lista todos os cartões"""
+    user = get_current_user()
+    db = get_db()
+    
+    cards_list = db.execute("""
+        SELECT c.*, a.name as account_name
+        FROM cards c
+        LEFT JOIN accounts a ON c.account_id = a.id
+        WHERE c.user_id = ? AND c.tenant_id = ? AND c.active = 1
+        ORDER BY c.name
+    """, (user['id'], user['tenant_id'])).fetchall()
+    
+    # Pegar contas para o form
+    accounts = db.execute("""
+        SELECT id, name FROM accounts
+        WHERE user_id = ? AND tenant_id = ? AND active = 1
+    """, (user['id'], user['tenant_id'])).fetchall()
+    
+    db.close()
+    
+    return render_template('cards.html',
+                         user=user,
+                         cards=[dict(c) for c in cards_list],
+                         accounts=[dict(a) for a in accounts])
+
+@app.route('/cards/add', methods=['POST'])
+@login_required
+def add_card():
+    """Adiciona novo cartão"""
+    user = get_current_user()
+    
+    account_id = request.form.get('account_id')
+    name = request.form.get('name')
+    last_digits = request.form.get('last_digits')
+    brand = request.form.get('brand')
+    limit_amount = float(request.form.get('limit_amount', 0))
+    closing_day = int(request.form.get('closing_day'))
+    due_day = int(request.form.get('due_day'))
+    
+    db = get_db()
+    card_id = str(uuid.uuid4())
+    
+    db.execute("""
+        INSERT INTO cards (id, account_id, user_id, tenant_id, name, last_digits, brand, limit_amount, closing_day, due_day)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (card_id, account_id, user['id'], user['tenant_id'], name, last_digits, brand, limit_amount, closing_day, due_day))
+    
+    db.commit()
+    db.close()
+    
+    flash(f'Cartão "{name}" adicionado com sucesso!', 'success')
+    return redirect(url_for('cards'))
+
+@app.route('/cards/edit', methods=['POST'])
+@login_required
+def edit_card():
+    """Edita um cartão existente"""
+    user = get_current_user()
+    
+    card_id = request.form.get('card_id')
+    account_id = request.form.get('account_id')
+    name = request.form.get('name')
+    last_digits = request.form.get('last_digits')
+    brand = request.form.get('brand')
+    limit_amount = float(request.form.get('limit_amount', 0))
+    closing_day = int(request.form.get('closing_day'))
+    due_day = int(request.form.get('due_day'))
+    
+    db = get_db()
+    
+    db.execute("""
+        UPDATE cards 
+        SET account_id = ?, name = ?, last_digits = ?, brand = ?, 
+            limit_amount = ?, closing_day = ?, due_day = ?
+        WHERE id = ? AND user_id = ?
+    """, (account_id, name, last_digits, brand, limit_amount, closing_day, due_day, card_id, user['id']))
+    
+    db.commit()
+    db.close()
+    
+    flash(f'Cartão "{name}" atualizado com sucesso!', 'success')
+    return redirect(url_for('cards'))
+
+# =====================================================
+# INSTALLMENTS (PARCELAMENTOS)
+# =====================================================
+
+@app.route('/installments')
+@login_required
+def installments_page():
+    """Página de parcelamentos"""
+    user = get_current_user()
+    status = request.args.get('status', 'active')
+    
+    db = get_db()
+    
+    # Buscar parcelamentos
+    query = """
+        SELECT * FROM v_installments_summary
+        WHERE user_id = ? AND tenant_id = ?
+    """
+    params = [user['id'], user['tenant_id']]
+    
+    if status != 'all':
+        query += " AND current_status = ?"
+        params.append(status)
+    
+    query += " ORDER BY first_due_date DESC"
+    
+    installments = db.execute(query, params).fetchall()
+    
+    # Buscar contas, cartões e categorias para o modal
+    accounts = db.execute("""
+        SELECT id, name FROM accounts
+        WHERE user_id = ? AND tenant_id = ? AND active = 1
+    """, (user['id'], user['tenant_id'])).fetchall()
+    
+    cards = db.execute("""
+        SELECT id, name FROM cards
+        WHERE user_id = ? AND tenant_id = ? AND active = 1
+    """, (user['id'], user['tenant_id'])).fetchall()
+    
+    categories = db.execute("""
+        SELECT id, name, icon FROM categories
+        WHERE type = 'Despesa'
+    """).fetchall()
+    
+    db.close()
+    
+    return render_template('installments.html',
+                         user=user,
+                         installments=[dict(i) for i in installments],
+                         accounts=[dict(a) for a in accounts],
+                         cards=[dict(c) for c in cards],
+                         categories=[dict(cat) for cat in categories],
+                         status=status,
+                         now=datetime.now(),
+                         timedelta=timedelta)
+
+@app.route('/installments/<installment_id>')
+@login_required
+def installment_details(installment_id):
+    """Detalhes e cronograma de um parcelamento"""
+    user = get_current_user()
+    
+    db = get_db()
+    
+    # Buscar parcelamento
+    installment = db.execute("""
+        SELECT * FROM v_installments_summary
+        WHERE id = ? AND user_id = ? AND tenant_id = ?
+    """, (installment_id, user['id'], user['tenant_id'])).fetchone()
+    
+    if not installment:
+        flash('Parcelamento não encontrado', 'error')
+        return redirect(url_for('installments_page'))
+    
+    # Buscar cronograma
+    schedule = db.execute("""
+        SELECT 
+            installment_number,
+            description,
+            value,
+            due_date,
+            status,
+            paid_at
+        FROM transactions
+        WHERE installment_id = ?
+        ORDER BY installment_number ASC
+    """, (installment_id,)).fetchall()
+    
+    # Calcular resumo
+    paid_installments = sum(1 for item in schedule if item['status'] == 'Pago')
+    pending_installments = sum(1 for item in schedule if item['status'] == 'Pendente')
+    total_paid = sum(item['value'] for item in schedule if item['status'] == 'Pago')
+    total_pending = sum(item['value'] for item in schedule if item['status'] == 'Pendente')
+    
+    summary = {
+        'total_installments': len(schedule),
+        'paid_installments': paid_installments,
+        'pending_installments': pending_installments,
+        'total_paid': total_paid,
+        'total_pending': total_pending
+    }
+    
+    db.close()
+    
+    return render_template('installment_details.html',
+                         user=user,
+                         installment=dict(installment),
+                         schedule=[dict(s) for s in schedule],
+                         summary=summary)
+
+@app.route('/installments/create', methods=['POST'])
+@login_required
+def create_installment_web():
+    """Cria parcelamento via formulário web"""
+    user = get_current_user()
+    
+    try:
+        description = request.form.get('description')
+        total_amount = float(request.form.get('total_amount'))
+        installment_count = int(request.form.get('installment_count'))
+        interest_rate = float(request.form.get('interest_rate', 0))
+        first_due_date = request.form.get('first_due_date')
+        account_id = request.form.get('account_id') or None
+        card_id = request.form.get('card_id') or None
+        category_id = request.form.get('category_id') or None
+        
+        # Chamar API REST
+        import requests
+        response = requests.post(f'http://localhost:5000/api/installments', json={
+            'description': description,
+            'total_amount': total_amount,
+            'installment_count': installment_count,
+            'interest_rate': interest_rate,
+            'first_due_date': first_due_date,
+            'account_id': account_id,
+            'card_id': card_id,
+            'category_id': category_id
+        }, cookies=request.cookies)
+        
+        if response.status_code == 201:
+            data = response.json()
+            flash(data['message'], 'success')
+        else:
+            error_data = response.json()
+            flash(f'Erro: {error_data.get("error", "Falha ao criar parcelamento")}', 'error')
+    
+    except Exception as e:
+        flash(f'Erro ao criar parcelamento: {str(e)}', 'error')
+    
+    return redirect(url_for('installments_page'))
+
+# =====================================================
+# INVESTMENTS (INVESTIMENTOS)
+# =====================================================
+
+@app.route('/investments')
+@login_required
+def investments_page():
+    """Página de listagem de investimentos"""
+    try:
+        user = get_current_user()
+        db = get_db()
+        
+        # Buscar todos os investimentos ativos
+        investments = db.execute("""
+            SELECT 
+                id,
+                name,
+                investment_type,
+                amount,
+                current_value,
+                investment_status,
+                created_at,
+                (current_value - amount) as profit,
+                CASE 
+                    WHEN amount > 0 THEN ((current_value - amount) / amount * 100)
+                    ELSE 0
+                END as profit_percent
+            FROM investments
+            WHERE user_id = ? AND tenant_id = ? AND (investment_status = 'active' OR investment_status IS NULL)
+            ORDER BY current_value DESC
+        """, (user['id'], user['tenant_id'])).fetchall()
+        
+        # Organizar investimentos por tipo
+        investments_by_type = {
+            'acao': [],
+            'cripto': [],
+            'tesouro': [],
+            'etf': [],
+            'fii': [],
+            'outros': []
+        }
+        
+        all_investments_list = []
+        
+        for inv in investments:
+            inv_dict = dict(inv)
+            all_investments_list.append(inv_dict)
+            inv_type = inv_dict.get('investment_type', '').lower()
+            
+            if 'acao' in inv_type or 'stock' in inv_type:
+                investments_by_type['acao'].append(inv_dict)
+            elif 'cripto' in inv_type or 'crypto' in inv_type:
+                investments_by_type['cripto'].append(inv_dict)
+            elif 'tesouro' in inv_type or 'treasury' in inv_type:
+                investments_by_type['tesouro'].append(inv_dict)
+            elif 'etf' in inv_type:
+                investments_by_type['etf'].append(inv_dict)
+            elif 'fii' in inv_type or 'fundo' in inv_type:
+                investments_by_type['fii'].append(inv_dict)
+            else:
+                investments_by_type['outros'].append(inv_dict)
+        
+        # Calcular resumo geral com valores seguros
+        summary = {
+            'total_investments': len(all_investments_list),
+            'total_invested': sum(float(inv.get('amount', 0) or 0) for inv in all_investments_list),
+            'total_current': sum(float(inv.get('current_value', 0) or 0) for inv in all_investments_list),
+        }
+        
+        summary['profit_loss'] = summary['total_current'] - summary['total_invested']
+        summary['profit_percent'] = (summary['profit_loss'] / summary['total_invested'] * 100) if summary['total_invested'] > 0 else 0
+        
+        # Última atualização
+        last_update = db.execute("""
+            SELECT MAX(created_at) as last_update FROM investments WHERE user_id = ?
+        """, (user['id'],)).fetchone()
+        
+        summary['last_update'] = last_update['last_update'] if last_update and last_update['last_update'] else None
+        
+        db.close()
+        
+        return render_template('investments.html', 
+                             user=user,
+                             investments_by_type=investments_by_type,
+                             all_investments=all_investments_list,
+                             summary=summary)
+    
+    except Exception as e:
+        print(f"❌ Erro na página de investimentos: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Retornar com dados vazios em caso de erro
+        return render_template('investments.html', 
+                             user=get_current_user(),
+                             investments_by_type={'acao': [], 'cripto': [], 'tesouro': [], 'etf': [], 'fii': [], 'outros': []},
+                             all_investments=[],
+                             summary={
+                                 'total_investments': 0,
+                                 'total_invested': 0,
+                                 'total_current': 0,
+                                 'profit_loss': 0,
+                                 'profit_percent': 0,
+                                 'last_update': None
+                             })
+
+@app.route('/investments/add', methods=['POST'])
+@login_required
+def add_investment():
+    """Adiciona novo investimento (compra ou venda)"""
+    user = get_current_user()
+    
+    operation_type = request.form.get('operation_type', 'compra')  # compra ou venda
+    name = request.form.get('name')
+    investment_type = request.form.get('investment_type')
+    amount = float(request.form.get('amount', 0))
+    current_value = float(request.form.get('current_value', 0))
+    quantity = float(request.form.get('quantity', 1))
+    other_costs = float(request.form.get('other_costs', 0))
+    start_date_str = request.form.get('start_date')
+    
+    # Usar data fornecida ou data atual
+    if start_date_str:
+        start_date = start_date_str
+    else:
+        start_date = datetime.now().strftime('%Y-%m-%d')
+    
+    db = get_db()
+    
+    try:
+            # Verificar se já existe um investimento com esse nome e tipo
+        existing = db.execute("""
+            SELECT id, amount, current_value, quantity FROM investments 
+            WHERE user_id = ? AND tenant_id = ? AND name = ? AND investment_type = ? AND investment_status = 'active'
+        """, (user['id'], user['tenant_id'], name, investment_type)).fetchone()
+        
+        if existing:
+            # Investimento já existe - ATUALIZAR
+            if operation_type == 'venda':
+                # Para venda: reduzir valores
+                new_quantity = existing['quantity'] - quantity
+                new_amount = existing['amount'] - amount
+                new_current_value = existing['current_value'] - current_value
+                
+                if new_quantity <= 0 or new_current_value <= 0:
+                    # Vendeu tudo - marcar como vendido
+                    db.execute("""
+                        UPDATE investments 
+                        SET current_value = 0, quantity = 0, investment_status = 'sold', updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (existing['id'],))
+                    flash_msg = f'Venda total registrada: {name} - R$ {current_value:.2f}'
+                else:
+                    # Vendeu parcialmente
+                    db.execute("""
+                        UPDATE investments 
+                        SET amount = ?, current_value = ?, quantity = ?, updated_at = CURRENT_TIMESTAMP
+                        WHERE id = ?
+                    """, (new_amount, new_current_value, new_quantity, existing['id']))
+                    flash_msg = f'Venda parcial registrada: {name} - R$ {current_value:.2f}'
+            else:
+                # Para compra: aumentar valores
+                new_amount = existing['amount'] + amount
+                new_current_value = existing['current_value'] + current_value
+                new_quantity = existing['quantity'] + quantity
+                
+                db.execute("""
+                    UPDATE investments 
+                    SET amount = ?, current_value = ?, quantity = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (new_amount, new_current_value, new_quantity, existing['id']))
+                
+                flash_msg = f'Compra adicionada a investimento existente: {name} - Total: R$ {new_current_value:.2f}'
+        else:
+            # Investimento NÃO existe - CRIAR NOVO (apenas para compra)
+            if operation_type == 'venda':
+                flash('Erro: Não é possível vender um ativo que você não possui!', 'error')
+                db.close()
+                return redirect(url_for('investments_page'))
+            
+            db.execute("""
+                INSERT INTO investments (user_id, tenant_id, name, investment_type, amount, current_value, quantity, start_date, investment_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active')
+            """, (user['id'], user['tenant_id'], name, investment_type, amount, current_value, quantity, start_date))
+            
+            flash_msg = f'Novo investimento criado: {name} - R$ {current_value:.2f}'
+        
+        db.commit()
+        flash(flash_msg, 'success')
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Erro ao adicionar investimento: {e}")
+        flash('Erro ao adicionar investimento. Tente novamente.', 'error')
+    finally:
+        db.close()
+    
+    return redirect(url_for('investments_page'))
+
+@app.route('/investments/<int:investment_id>')
+@login_required
+def investment_details(investment_id):
+    """Página de detalhes de um investimento"""
+    user = get_current_user()
+    return render_template('investment_details.html', user=user, investment_id=investment_id)
+
+# =====================================================
+# ATUALIZAÇÃO DE COTAÇÕES
+# =====================================================
+
+def extract_ticker(name):
+    """Extrai o ticker do nome do investimento"""
+    # Remove espaços e converte para maiúsculo
+    name_upper = name.upper().strip()
+    
+    # Padrões de ticker brasileiro (PETR4, VALE3, etc)
+    match = re.search(r'\b([A-Z]{4}\d{1,2})\b', name_upper)
+    if match:
+        return match.group(1)
+    
+    # Se não encontrar padrão, retorna o nome limpo
+    words = name_upper.split()
+    if words:
+        return words[0]
+    
+    return name_upper
+
+def get_stock_price(ticker):
+    """Busca cotação de ação brasileira via API Brapi"""
+    try:
+        # API Brapi - Cotações B3
+        url = f"https://brapi.dev/api/quote/{ticker}?token=demo"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if 'results' in data and len(data['results']) > 0:
+                price = data['results'][0].get('regularMarketPrice', 0)
+                return float(price) if price else None
+    except Exception as e:
+        print(f"❌ Erro ao buscar cotação de {ticker}: {e}")
+    
+    return None
+
+def get_crypto_price(crypto_name):
+    """Busca cotação de criptomoeda via CoinGecko"""
+    try:
+        # Mapear nomes comuns para IDs CoinGecko
+        crypto_map = {
+            'BITCOIN': 'bitcoin',
+            'BTC': 'bitcoin',
+            'ETHEREUM': 'ethereum',
+            'ETH': 'ethereum',
+            'BNB': 'binancecoin',
+            'CARDANO': 'cardano',
+            'ADA': 'cardano',
+            'SOLANA': 'solana',
+            'SOL': 'solana',
+            'XRP': 'ripple',
+            'RIPPLE': 'ripple',
+            'DOGE': 'dogecoin',
+            'DOGECOIN': 'dogecoin'
+        }
+        
+        crypto_id = crypto_map.get(crypto_name.upper(), crypto_name.lower())
+        
+        url = f"https://api.coingecko.com/api/v3/simple/price?ids={crypto_id}&vs_currencies=brl"
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            if crypto_id in data and 'brl' in data[crypto_id]:
+                return float(data[crypto_id]['brl'])
+    except Exception as e:
+        print(f"❌ Erro ao buscar cotação de {crypto_name}: {e}")
+    
+    return None
+
+@app.route('/investments/update-quotes', methods=['POST'])
+@login_required
+def update_investment_quotes():
+    """Atualiza cotações de todos os investimentos ativos usando API real"""
+    user = get_current_user()
+    db = get_db()
+    
+    updated = 0
+    errors = 0
+    
+    try:
+        # Usar o novo serviço de API
+        from services.api_connectors import InvestmentAPIFactory
+        
+        # Buscar investimentos ativos COM quantidade
+        investments = db.execute("""
+            SELECT id, name, investment_type, amount, current_value, quantity
+            FROM investments 
+            WHERE user_id = ? AND tenant_id = ? AND investment_status = 'active'
+        """, (user['id'], user['tenant_id'])).fetchall()
+        
+        for inv in investments:
+            # Converter Row para dict
+            inv_dict = dict(inv)
+            
+            # Para ações, tentar Investidor10 primeiro (dados fundamentalistas + preço)
+            api_data = None
+            
+            if inv_dict['investment_type'] in ['Ações', 'FII', 'ETF', 'ETFs', 'Stock', 'Stocks', 'Ação']:
+                print(f"📊 Buscando {inv_dict['name']} via Investidor10...")
+                api_data = InvestmentAPIFactory.get_stock_with_fundamentals(inv_dict['name'])
+            
+            # Para outros tipos ou se Investidor10 falhou, usar factory padrão
+            if not api_data:
+                api_data = InvestmentAPIFactory.get_investment_data(
+                    inv_dict['investment_type'], 
+                    inv_dict['name']
+                )
+            
+            if not api_data:
+                # Tentar detectar se é cripto mesmo que tipo esteja errado
+                crypto_keywords = ['BITCOIN', 'BTC', 'ETHEREUM', 'ETH', 'CRYPTO', 'CRIPTO', 
+                                 'BNB', 'CARDANO', 'ADA', 'SOLANA', 'SOL', 'XRP', 'RIPPLE', 
+                                 'DOGE', 'DOGECOIN', 'USDT', 'USDC', 'MATIC', 'POLYGON']
+                
+                name_upper = inv_dict['name'].upper()
+                is_crypto = any(keyword in name_upper for keyword in crypto_keywords)
+                
+                if is_crypto:
+                    api_data = InvestmentAPIFactory.get_investment_data('Criptomoedas', inv_dict['name'])
+                    print(f"🔍 Detectado como cripto: {inv_dict['name']}")
+            
+            if not api_data:
+                errors += 1
+                print(f"⚠️ Não foi possível buscar dados: {inv_dict['name']}")
+                continue
+            
+            # Pegar o preço correto da API
+            new_price = api_data.get('price', 0)
+            
+            if new_price and new_price > 0:
+                # CORREÇÃO: Usar a quantidade REAL do banco de dados
+                # Se não tiver quantidade, calcular baseado no valor investido original
+                quantity_owned = inv_dict.get('quantity', 1)
+                
+                if not quantity_owned or quantity_owned <= 0:
+                    # Fallback: calcular quantidade baseado no investimento original
+                    # Assumir que o preço médio de compra = amount / quantidade
+                    # Se amount = 1000 e current_value = 1200, assumir quantidade = 1
+                    quantity_owned = 1
+                
+                # Novo valor atual = quantidade real × preço atual da API
+                new_current_value = quantity_owned * new_price
+                
+                # Atualizar no banco
+                db.execute("""
+                    UPDATE investments 
+                    SET current_value = ?, updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                """, (new_current_value, inv_dict['id']))
+                
+                updated += 1
+                
+                # Calcular rentabilidade para exibir
+                profit_pct = ((new_current_value - inv_dict['amount']) / inv_dict['amount'] * 100) if inv_dict['amount'] > 0 else 0
+                
+                print(f"✅ {inv_dict['name']}: Qtd {quantity_owned} × R$ {new_price:.2f} = R$ {new_current_value:.2f} ({profit_pct:+.2f}%)")
+            else:
+                errors += 1
+                print(f"⚠️ Preço inválido para: {inv_dict['name']}")
+        
+        db.commit()
+        
+        return jsonify({
+            'success': True,
+            'updated': updated,
+            'errors': errors,
+            'message': f'{updated} investimentos atualizados com sucesso!'
+        })
+        
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Erro ao atualizar cotações: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+    finally:
+        db.close()
+
+# =====================================================
+# TRANSACTIONS (TRANSAÇÕES)
+# =====================================================
+
+@app.route('/transactions/add', methods=['POST'])
+@login_required
+def add_transaction():
+    """Adiciona nova transação"""
+    user = get_current_user()
+    
+    account_id = request.form.get('account_id')
+    category_id = request.form.get('category_id') or None
+    card_id = request.form.get('card_id') or None
+    trans_type = request.form.get('type')
+    description = request.form.get('description')
+    value = float(request.form.get('value'))
+    date = request.form.get('date')
+    is_fixed = request.form.get('is_fixed') == 'on'
+    status = request.form.get('status', 'Pago')
+    
+    db = get_db()
+    transaction_id = str(uuid.uuid4())
+    
+    db.execute("""
+        INSERT INTO transactions (id, user_id, tenant_id, account_id, category_id, card_id, type, description, value, date, status, is_fixed, paid_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (transaction_id, user['id'], user['tenant_id'], account_id, category_id, card_id, trans_type, description, value, date, status, is_fixed, datetime.now() if status == 'Pago' else None))
+    
+    # Se a transação for com cartão e for despesa, deduzir do limite disponível
+    if card_id and trans_type == 'Despesa':
+        db.execute("""
+            UPDATE cards 
+            SET used_limit = COALESCE(used_limit, 0) + ?
+            WHERE id = ? AND user_id = ?
+        """, (value, card_id, user['id']))
+    
+    db.commit()
+    db.close()
+    
+    # INTEGRAÇÃO: Atualizar saldo da conta
+    from routes.accounts import update_account_balance_after_transaction
+    update_account_balance_after_transaction(transaction_id)
+    
+    flash(f'Transação "{description}" adicionada!', 'success')
+    return redirect(url_for('dashboard'))
+
+@app.route('/transactions/delete/<transaction_id>', methods=['POST'])
+@login_required
+def delete_transaction(transaction_id):
+    """Deleta transação"""
+    user = get_current_user()
+    db = get_db()
+    
+    # Buscar dados da transação antes de deletar (para restaurar limite do cartão)
+    transaction = db.execute("""
+        SELECT account_id, card_id, type, value 
+        FROM transactions 
+        WHERE id = ? AND user_id = ?
+    """, (transaction_id, user['id'])).fetchone()
+    
+    if not transaction:
+        flash('Transação não encontrada!', 'error')
+        return redirect(url_for('dashboard'))
+    
+    account_id = transaction['account_id']
+    card_id = transaction['card_id']
+    trans_type = transaction['type']
+    value = transaction['value']
+    
+    # Se a transação era com cartão e despesa, devolver o limite
+    if card_id and trans_type == 'Despesa':
+        db.execute("""
+            UPDATE cards 
+            SET used_limit = COALESCE(used_limit, 0) - ?
+            WHERE id = ? AND user_id = ?
+        """, (value, card_id, user['id']))
+    
+    # Deletar a transação
+    db.execute("DELETE FROM transactions WHERE id = ? AND user_id = ?", (transaction_id, user['id']))
+    db.commit()
+    db.close()
+    
+    # INTEGRAÇÃO: Recalcular saldo da conta
+    if account_id:
+        from routes.accounts import recalculate_account_balance
+        recalculate_account_balance(account_id)
+    
+    flash('Transação excluída!', 'success')
+    return redirect(url_for('dashboard'))
+
+# =====================================================
+# API ENDPOINTS (JSON)
+# =====================================================
+
+@app.route('/api/summary')
+@login_required
+def api_summary():
+    """Retorna resumo financeiro (API)"""
+    user = get_current_user()
+    year = request.args.get('year', datetime.now().year, type=int)
+    month = request.args.get('month', datetime.now().month, type=int)
+    
+    db = get_db()
+    summary = db.execute("""
+        SELECT 
+            COALESCE(SUM(CASE WHEN type = 'Receita' AND is_fixed = 1 THEN value ELSE 0 END), 0) as renda_fixa,
+            COALESCE(SUM(CASE WHEN type = 'Receita' AND is_fixed = 0 THEN value ELSE 0 END), 0) as renda_variavel,
+            COALESCE(SUM(CASE WHEN type = 'Receita' THEN value ELSE 0 END), 0) as renda_total,
+            COALESCE(SUM(CASE WHEN type = 'Despesa' AND is_fixed = 1 THEN value ELSE 0 END), 0) as custo_fixo,
+            COALESCE(SUM(CASE WHEN type = 'Despesa' AND is_fixed = 0 THEN value ELSE 0 END), 0) as custo_variavel,
+            COALESCE(SUM(CASE WHEN type = 'Despesa' THEN value ELSE 0 END), 0) as custo_total
+        FROM transactions
+        WHERE user_id = ? AND tenant_id = ? AND status = 'Pago'
+        AND strftime('%Y', date) = ? AND strftime('%m', date) = ?
+    """, (user['id'], user['tenant_id'], str(year), f"{month:02d}")).fetchone()
+    
+    db.close()
+    
+    if summary:
+        data = dict(summary)
+        data['saldo_mensal'] = data['renda_total'] - data['custo_total']
+        return jsonify(data)
+    else:
+        return jsonify({
+            'renda_fixa': 0, 'renda_variavel': 0, 'renda_total': 0,
+            'custo_fixo': 0, 'custo_variavel': 0, 'custo_total': 0,
+            'saldo_mensal': 0
+        })
+
+@app.route('/api/recurring/execute-now', methods=['POST'])
+@login_required
+def execute_recurring_now():
+    """Executa transações recorrentes manualmente (ADMIN apenas)"""
+    user = get_current_user()
+    
+    if not user or not user.get('is_admin'):
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    from scheduler import trigger_manual_execution
+    count = trigger_manual_execution()
+    
+    return jsonify({
+        'success': True,
+        'message': f'{count} transações recorrentes executadas',
+        'count': count
+    })
+
+@app.route('/admin/update-investments', methods=['POST'])
+@login_required
+def admin_update_investments():
+    """Atualiza investimentos manualmente (admin)"""
+    user = get_current_user()
+    
+    if not user or not user.get('is_admin'):
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    from scheduler import trigger_investments_update
+    stats = trigger_investments_update()
+    
+    return jsonify({
+        'success': True,
+        'message': f'Investimentos atualizados: {stats["success"]} sucesso, {stats["failed"]} falhas',
+        'stats': stats
+    })
+
+# =====================================================
+# MAIN
+# =====================================================
+
+if __name__ == '__main__':
+    # Criar banco se não existir
+    if not os.path.exists(app.config['DATABASE']):
+        print("🔨 Creating database...")
+        init_db()
+        seed_default_data()
+    
+    # Iniciar scheduler de transações recorrentes
+    from scheduler import start_scheduler
+    start_scheduler()
+    
+    print("🚀 Starting BWS Finance Flask Server...")
+    print("📍 Local: http://localhost:5000")
+    print("🌐 External: http://45.173.36.138:5000")
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+
+
+
+
+

@@ -1,0 +1,267 @@
+# CasaOS App Configuration for BWS Finance
+name: bws-finance
+services:
+  bws-backend:
+    image: ghcr.io/bws-team/bws-finance:latest  # Ou sua imagem custom
+    deploy:
+      resources:
+        reservations:
+          memory: 512M
+    network_mode: bridge
+    ports:
+      - target: 5000
+        published: "5000"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/data
+        target: /app/data
+      - type: bind
+        source: /DATA/AppData/$AppID/logs
+        target: /app/logs
+      - type: bind
+        source: /DATA/AppData/$AppID/templates
+        target: /app/templates
+    x-casaos:
+      envs:
+        - container: SECRET_KEY
+          description:
+            en_us: Flask secret key (minimum 32 characters)
+            pt_br: Chave secreta do Flask (mínimo 32 caracteres)
+          default: change-this-to-random-32-chars-minimum
+          
+        - container: WHATSAPP_SERVER_URL
+          description:
+            en_us: WhatsApp server URL
+            pt_br: URL do servidor WhatsApp
+          default: http://bws-whatsapp:3000
+          
+        - container: WHATSAPP_AUTH_TOKEN
+          description:
+            en_us: WhatsApp authentication token
+            pt_br: Token de autenticação do WhatsApp
+          default: change-me-to-secure-token
+          
+        - container: WHATSAPP_ENABLED
+          description:
+            en_us: Enable WhatsApp notifications
+            pt_br: Habilitar notificações via WhatsApp
+          default: "true"
+          
+        - container: SMTP_HOST
+          description:
+            en_us: SMTP server hostname
+            pt_br: Servidor SMTP (ex: smtp.gmail.com)
+          default: smtp.gmail.com
+          
+        - container: SMTP_PORT
+          description:
+            en_us: SMTP server port
+            pt_br: Porta do servidor SMTP
+          default: "587"
+          
+        - container: SMTP_USER
+          description:
+            en_us: SMTP username (email address)
+            pt_br: Usuário SMTP (endereço de email)
+          
+        - container: SMTP_PASSWORD
+          description:
+            en_us: SMTP password or App Password
+            pt_br: Senha SMTP ou App Password
+          
+        - container: SMTP_FROM
+          description:
+            en_us: From email address
+            pt_br: Endereço de email remetente
+          default: noreply@bwsfinance.com
+          
+        - container: AUTO_NOTIFICATIONS_ENABLED
+          description:
+            en_us: Enable automatic notifications
+            pt_br: Habilitar notificações automáticas
+          default: "true"
+          
+        - container: NOTIFY_DEFAULT_LOW_BALANCE
+          description:
+            en_us: Low balance threshold (default alert)
+            pt_br: Limite de saldo baixo (alerta padrão)
+          default: "100.00"
+          
+        - container: NOTIFY_INVEST_PCT
+          description:
+            en_us: Investment variation threshold (%)
+            pt_br: Variação de investimento para alerta (%)
+          default: "3.0"
+          
+      ports:
+        - container: "5000"
+          description:
+            en_us: Web UI and API Port
+            pt_br: Interface Web e porta da API
+          
+      volumes:
+        - container: /app/data
+          description:
+            en_us: Database and persistent data
+            pt_br: Banco de dados e dados persistentes
+            
+        - container: /app/logs
+          description:
+            en_us: Application logs
+            pt_br: Logs da aplicação
+            
+        - container: /app/templates
+          description:
+            en_us: Email and notification templates
+            pt_br: Templates de email e notificações
+            
+    container_name: bws-finance-backend
+    
+  bws-whatsapp:
+    image: wppconnect/wppconnect-server:latest
+    deploy:
+      resources:
+        reservations:
+          memory: 256M
+    network_mode: bridge
+    ports:
+      - target: 21465
+        published: "3000"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: bind
+        source: /DATA/AppData/$AppID/whatsapp
+        target: /home/node/app/tokens
+    environment:
+      PORT: "21465"
+      SECRET_KEY: "${WHATSAPP_AUTH_TOKEN}"
+      SESSION: "bws-finance"
+    x-casaos:
+      ports:
+        - container: "21465"
+          description:
+            en_us: WhatsApp API Port
+            pt_br: Porta da API do WhatsApp
+      volumes:
+        - container: /home/node/app/tokens
+          description:
+            en_us: WhatsApp session tokens
+            pt_br: Tokens de sessão do WhatsApp
+    container_name: bws-finance-whatsapp
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+    - arm
+  main: bws-backend
+  description:
+    en_us: |
+      Personal finance management system with automatic notifications.
+      
+      Features:
+      - Transaction tracking (income/expenses)
+      - Credit card management with installments
+      - Investment portfolio tracking
+      - Automatic notifications via WhatsApp and Email
+      - Invoice reminders (3, 2, 1, 0 days before due)
+      - Low balance alerts
+      - Monthly spending reports
+      - Investment threshold alerts
+      - Recurring transactions
+      - Multi-account support
+      
+      Notifications are sent automatically by a background scheduler.
+      
+    pt_br: |
+      Sistema de gestão financeira pessoal com notificações automáticas.
+      
+      Recursos:
+      - Rastreamento de transações (receitas/despesas)
+      - Gestão de cartões de crédito com parcelamentos
+      - Acompanhamento de portfólio de investimentos
+      - Notificações automáticas via WhatsApp e Email
+      - Lembretes de faturas (3, 2, 1, 0 dias antes do vencimento)
+      - Alertas de saldo baixo
+      - Relatórios mensais de gastos
+      - Alertas de variação de investimentos
+      - Transações recorrentes
+      - Suporte a múltiplas contas
+      
+      As notificações são enviadas automaticamente por um scheduler em background.
+      
+  tagline:
+    en_us: Complete financial control with smart notifications
+    pt_br: Controle financeiro completo com notificações inteligentes
+    
+  developer: BWS Team
+  author: BWS Team
+  icon: https://cdn-icons-png.flaticon.com/512/2830/2830284.png
+  thumbnail: https://cdn-icons-png.flaticon.com/512/3135/3135706.png
+  
+  title:
+    en_us: BWS Finance
+    pt_br: BWS Finance
+    
+  category: Finance
+  project_url: https://github.com/bws-team/bws-finance
+  screenshot_link:
+    - https://via.placeholder.com/800x600.png?text=BWS+Finance+Dashboard
+    - https://via.placeholder.com/800x600.png?text=Transaction+Management
+    - https://via.placeholder.com/800x600.png?text=Notification+Settings
+    
+  tips:
+    before_install:
+      en_us: |
+        Before installing:
+        1. Prepare your Gmail App Password (if using Gmail for notifications)
+        2. Make sure ports 5000 and 3000 are available
+        3. Allocate at least 768MB of RAM for both services
+        
+      pt_br: |
+        Antes de instalar:
+        1. Prepare seu App Password do Gmail (se usar Gmail para notificações)
+        2. Certifique-se de que as portas 5000 e 3000 estão disponíveis
+        3. Aloque pelo menos 768MB de RAM para ambos os serviços
+        
+    after_install:
+      en_us: |
+        After installation:
+        1. Access http://your-ip:5000 to create your account
+        2. Configure notification preferences in Settings
+        3. Scan WhatsApp QR code at http://your-ip:3000
+        4. Test notifications via API: POST /api/notifications/send
+        
+        Scheduler runs automatically:
+        - Invoice check: Daily at 09:00
+        - Balance check: Daily at 06:00
+        - Investment check: Daily at 08:05
+        - Monthly reports: Sundays at 18:00
+        
+      pt_br: |
+        Após a instalação:
+        1. Acesse http://seu-ip:5000 para criar sua conta
+        2. Configure preferências de notificação em Configurações
+        3. Escaneie o QR code do WhatsApp em http://seu-ip:3000
+        4. Teste notificações via API: POST /api/notifications/send
+        
+        Scheduler executa automaticamente:
+        - Verificação de faturas: Diariamente às 09:00
+        - Verificação de saldo: Diariamente às 06:00
+        - Verificação de investimentos: Diariamente às 08:05
+        - Relatórios mensais: Domingos às 18:00
+        
+  port_map: "5000"
+  scheme: http
+  index: /
+  store_app_id: bws-finance
+  author: BWS Team
+  
+  # Compatibilidade com CasaOS 0.4.4+
+  hostname: ""
+  privileged: false
+  cap_add: []
+  devices: []

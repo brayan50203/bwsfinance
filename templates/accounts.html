@@ -1,0 +1,70 @@
+﻿{% extends 'base.html' %}
+{% block title %}Contas - BWS Finance{% endblock %}
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <div>
+        <h1 class="text-4xl font-bold text-gray-800">🏦 Minhas Contas</h1>
+        <p class="text-gray-600 mt-2">Gerencie suas contas bancárias</p>
+    </div>
+    <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg">
+        ➕ Nova Conta
+    </button>
+</div>
+<div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 text-white mb-8 shadow-xl">
+    <p class="text-sm opacity-90 mb-2">💰 Saldo Total</p>
+    <p class="text-5xl font-bold">R$ {{ total_balance|brl }}</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for account in accounts %}
+    {% if account.name != 'Conta Principal' %}
+    <div class="bg-white rounded-xl shadow-lg p-6 border">
+        <h3 class="text-xl font-bold mb-2">{{ account.name }}</h3>
+        <p class="text-sm text-gray-500 mb-4">{{ account.type }}</p>
+        <p class="text-3xl font-bold text-green-600">R$ {{ account.current_balance|brl }}</p>
+    </div>
+    {% endif %}
+    {% endfor %}
+</div>
+<div id="modal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-8 max-w-md w-full mx-4">
+        <h2 class="text-2xl font-bold mb-6">Nova Conta</h2>
+        <form id="form" onsubmit="saveAccount(event)">
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Nome</label>
+                <input type="text" name="name" required class="w-full border-2 rounded-xl px-4 py-3">
+            </div>
+            <div class="mb-4">
+                <label class="block font-semibold mb-2">Tipo</label>
+                <select name="type" required class="w-full border-2 rounded-xl px-4 py-3">
+                    <option>Corrente</option>
+                    <option>Poupança</option>
+                    <option>Investimento</option>
+                    <option>Carteira</option>
+                </select>
+            </div>
+            <div class="mb-6">
+                <label class="block font-semibold mb-2">Saldo Inicial</label>
+                <input type="number" step="0.01" name="initial_balance" required class="w-full border-2 rounded-xl px-4 py-3">
+            </div>
+            <div class="flex gap-3">
+                <button type="button" onclick="closeModal()" class="flex-1 bg-gray-200 py-3 rounded-xl font-semibold">Cancelar</button>
+                <button type="submit" class="flex-1 bg-blue-600 text-white py-3 rounded-xl font-semibold">Salvar</button>
+            </div>
+        </form>
+    </div>
+</div>
+<script>
+function openModal(){document.getElementById('modal').classList.remove('hidden');}
+function closeModal(){document.getElementById('modal').classList.add('hidden');document.getElementById('form').reset();}
+async function saveAccount(e){
+    e.preventDefault();
+    const form=e.target;
+    const data={name:form.name.value,type:form.type.value,initial_balance:parseFloat(form.initial_balance.value)};
+    try{
+        const res=await fetch('/accounts/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+        const result=await res.json();
+        if(result.success){location.reload();}else{alert('Erro: '+(result.message||'Erro desconhecido'));}
+    }catch(error){alert('Erro: '+error.message);}
+}
+</script>
+{% endblock %}

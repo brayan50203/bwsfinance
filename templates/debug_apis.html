@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug - Contas e Cartões</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        h1 { color: #2c3e50; }
+        .section {
+            background: white;
+            padding: 20px;
+            margin: 15px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .success { border-left: 5px solid #28a745; }
+        .error { border-left: 5px solid #dc3545; }
+        .warning { border-left: 5px solid #ffc107; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        button:disabled { background: #6c757d; cursor: not-allowed; }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            max-height: 400px;
+        }
+        .loading { color: #007bff; }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .stat-card h3 { margin: 0 0 10px 0; }
+        .stat-card .number { font-size: 36px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Debug - Contas, Cartões e Categorias</h1>
+    
+    <div class="section">
+        <h2>🎯 Testes Rápidos</h2>
+        <button onclick="testAll()">🚀 Testar Tudo</button>
+        <button onclick="testAccounts()">📊 Contas</button>
+        <button onclick="testCards()">💳 Cartões</button>
+        <button onclick="testCategories()">📂 Categorias</button>
+        <button onclick="clearResults()">🗑️ Limpar</button>
+    </div>
+
+    <div class="stats" id="stats"></div>
+    
+    <div id="results"></div>
+
+    <script>
+        let accountsData = null;
+        let cardsData = null;
+        let categoriesData = null;
+
+        async function testAccounts() {
+            addSection('📊 Testando API de Contas...', 'loading');
+            try {
+                const response = await fetch('/api/accounts');
+                const text = await response.text();
+                
+                addSection(`Status: ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+                
+                if (!response.ok) {
+                    addSection(`❌ Erro HTTP:\n${text}`, 'error');
+                    return;
+                }
+                
+                try {
+                    const data = JSON.parse(text);
+                    accountsData = data;
+                    
+                    addSection(`✅ Resposta recebida!`, 'success');
+                    addSection(`Tipo: ${Array.isArray(data) ? 'Array' : typeof data}`, 'success');
+                    
+                    if (Array.isArray(data)) {
+                        addSection(`✅ ${data.length} contas encontradas`, 'success');
+                        addSection('Estrutura da primeira conta:', 'success');
+                        addSection(JSON.stringify(data[0], null, 2), 'success');
+                    } else if (data.accounts) {
+                        addSection(`✅ ${data.accounts.length} contas em data.accounts`, 'success');
+                        addSection('Estrutura da primeira conta:', 'success');
+                        addSection(JSON.stringify(data.accounts[0], null, 2), 'success');
+                    } else {
+                        addSection('⚠️ Formato inesperado:', 'warning');
+                        addSection(JSON.stringify(data, null, 2), 'warning');
+                    }
+                } catch (e) {
+                    addSection(`❌ Erro ao parsear JSON: ${e.message}`, 'error');
+                    addSection(`Resposta raw:\n${text}`, 'error');
+                }
+                
+            } catch (error) {
+                addSection(`❌ Erro na requisição: ${error.message}`, 'error');
+            }
+            updateStats();
+        }
+
+        async function testCards() {
+            addSection('💳 Testando API de Cartões...', 'loading');
+            try {
+                const response = await fetch('/api/cards');
+                const text = await response.text();
+                
+                addSection(`Status: ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+                
+                if (!response.ok) {
+                    addSection(`❌ Erro HTTP:\n${text}`, 'error');
+                    return;
+                }
+                
+                try {
+                    const data = JSON.parse(text);
+                    cardsData = data;
+                    
+                    addSection(`✅ Resposta recebida!`, 'success');
+                    
+                    if (data.success && data.cards) {
+                        addSection(`✅ ${data.cards.length} cartões encontrados`, 'success');
+                        if (data.cards.length > 0) {
+                            addSection('Estrutura do primeiro cartão:', 'success');
+                            addSection(JSON.stringify(data.cards[0], null, 2), 'success');
+                        }
+                    } else if (Array.isArray(data)) {
+                        addSection(`✅ ${data.length} cartões em array`, 'success');
+                    } else {
+                        addSection('⚠️ Formato inesperado:', 'warning');
+                        addSection(JSON.stringify(data, null, 2), 'warning');
+                    }
+                } catch (e) {
+                    addSection(`❌ Erro ao parsear JSON: ${e.message}`, 'error');
+                    addSection(`Resposta raw:\n${text}`, 'error');
+                }
+                
+            } catch (error) {
+                addSection(`❌ Erro na requisição: ${error.message}`, 'error');
+            }
+            updateStats();
+        }
+
+        async function testCategories() {
+            addSection('📂 Testando API de Categorias...', 'loading');
+            try {
+                const response = await fetch('/api/categories');
+                const text = await response.text();
+                
+                addSection(`Status: ${response.status} ${response.statusText}`, 
+                    response.ok ? 'success' : 'error');
+                
+                if (!response.ok) {
+                    addSection(`❌ Erro HTTP:\n${text}`, 'error');
+                    return;
+                }
+                
+                try {
+                    const data = JSON.parse(text);
+                    categoriesData = data;
+                    
+                    addSection(`✅ Resposta recebida!`, 'success');
+                    
+                    if (data.success && data.categories) {
+                        const receitas = data.categories.filter(c => c.type === 'Receita');
+                        const despesas = data.categories.filter(c => c.type === 'Despesa');
+                        addSection(`✅ ${data.categories.length} categorias (${receitas.length} receitas, ${despesas.length} despesas)`, 'success');
+                        addSection('Primeiras 5 categorias:', 'success');
+                        addSection(JSON.stringify(data.categories.slice(0, 5), null, 2), 'success');
+                    } else if (Array.isArray(data)) {
+                        addSection(`✅ ${data.length} categorias em array`, 'success');
+                    } else {
+                        addSection('⚠️ Formato inesperado:', 'warning');
+                        addSection(JSON.stringify(data, null, 2), 'warning');
+                    }
+                } catch (e) {
+                    addSection(`❌ Erro ao parsear JSON: ${e.message}`, 'error');
+                    addSection(`Resposta raw:\n${text}`, 'error');
+                }
+                
+            } catch (error) {
+                addSection(`❌ Erro na requisição: ${error.message}`, 'error');
+            }
+            updateStats();
+        }
+
+        async function testAll() {
+            clearResults();
+            await testAccounts();
+            await testCards();
+            await testCategories();
+        }
+
+        function addSection(content, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `section ${type}`;
+            
+            if (content.includes('\n') || content.includes('{')) {
+                const pre = document.createElement('pre');
+                pre.textContent = content;
+                div.appendChild(pre);
+            } else {
+                div.textContent = content;
+            }
+            
+            document.getElementById('results').appendChild(div);
+            div.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('stats').innerHTML = '';
+            accountsData = null;
+            cardsData = null;
+            categoriesData = null;
+        }
+
+        function updateStats() {
+            const statsDiv = document.getElementById('stats');
+            
+            let contas = 0;
+            if (accountsData) {
+                contas = Array.isArray(accountsData) ? accountsData.length : (accountsData.accounts?.length || 0);
+            }
+            
+            let cartoes = 0;
+            if (cardsData) {
+                cartoes = cardsData.cards?.length || (Array.isArray(cardsData) ? cardsData.length : 0);
+            }
+            
+            let categorias = 0;
+            if (categoriesData) {
+                categorias = categoriesData.categories?.length || (Array.isArray(categoriesData) ? categoriesData.length : 0);
+            }
+            
+            statsDiv.innerHTML = `
+                <div class="stat-card">
+                    <h3>📊 Contas</h3>
+                    <div class="number">${contas}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>💳 Cartões</h3>
+                    <div class="number">${cartoes}</div>
+                </div>
+                <div class="stat-card">
+                    <h3>📂 Categorias</h3>
+                    <div class="number">${categorias}</div>
+                </div>
+            `;
+        }
+
+        // Executar testes automaticamente ao carregar
+        window.onload = () => {
+            addSection('🔍 Página carregada! Clique em "Testar Tudo" ou teste individualmente.', 'info');
+        };
+    </script>
+</body>
+</html>

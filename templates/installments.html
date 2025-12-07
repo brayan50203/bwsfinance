@@ -1,0 +1,379 @@
+{% extends "base.html" %}
+
+{% block title %}Parcelamentos - BWS Finance{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <!-- Header -->
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">💳 Parcelamentos</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-2">Gerencie suas compras parceladas</p>
+        </div>
+        <button onclick="openCreateModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold shadow-lg transition duration-200 flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            Novo Parcelamento
+        </button>
+    </div>
+
+    <!-- Filtros -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-4 mb-6">
+        <div class="flex gap-4 items-center">
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Status:</label>
+            <div class="flex gap-2">
+                <button onclick="filterByStatus('all')" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-blue-600 text-white' if status == 'all' else 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                    Todos
+                </button>
+                <button onclick="filterByStatus('active')" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-blue-600 text-white' if status == 'active' else 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                    Ativos
+                </button>
+                <button onclick="filterByStatus('cancelled')" class="px-4 py-2 rounded-lg text-sm font-medium transition {{ 'bg-blue-600 text-white' if status == 'cancelled' else 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600' }}">
+                    Cancelados
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de Parcelamentos -->
+    {% if installments %}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {% for inst in installments %}
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md hover:shadow-xl transition duration-300 overflow-hidden">
+                <!-- Header do Card -->
+                <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-4 text-white">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-xl font-bold">{{ inst.description }}</h3>
+                            <p class="text-blue-100 text-sm mt-1">
+                                {{ inst.installment_count }}x de R$ {{ "%.2f"|format(inst.installment_value) }}
+                            </p>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-semibold {{ 'bg-green-500' if inst.current_status == 'active' else 'bg-gray-500' }}">
+                            {{ 'Ativo' if inst.current_status == 'active' else 'Cancelado' }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Corpo do Card -->
+                <div class="p-6">
+                    <!-- Valores -->
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Valor Total</p>
+                            <p class="text-2xl font-bold text-gray-800 dark:text-white">
+                                R$ {{ "%.2f"|format(inst.total_amount) }}
+                            </p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-600 dark:text-gray-400">Valor Pago</p>
+                            <p class="text-2xl font-bold text-green-600">
+                                R$ {{ "%.2f"|format(inst.total_paid or 0) }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Progresso -->
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm mb-2">
+                            <span class="text-gray-600 dark:text-gray-400">Progresso</span>
+                            <span class="font-semibold text-gray-800 dark:text-white">
+                                {{ inst.total_transactions or 0 }} / {{ inst.installment_count }} parcelas
+                            </span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                            {% set progress = ((inst.total_transactions or 0) / inst.installment_count * 100) if inst.installment_count > 0 else 0 %}
+                            <div class="bg-gradient-to-r from-green-500 to-green-600 h-3 rounded-full transition-all duration-500" style="width: {{ progress }}%"></div>
+                        </div>
+                    </div>
+
+                    <!-- Info Adicional -->
+                    <div class="flex gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        {% if inst.account_name %}
+                        <div class="flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                            </svg>
+                            {{ inst.account_name }}
+                        </div>
+                        {% endif %}
+                        {% if inst.card_name %}
+                        <div class="flex items-center gap-1">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"></path>
+                            </svg>
+                            {{ inst.card_name }}
+                        </div>
+                        {% endif %}
+                        {% if inst.category_name %}
+                        <div class="flex items-center gap-1">
+                            <span>{{ inst.category_icon }}</span>
+                            {{ inst.category_name }}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Primeira Parcela -->
+                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                        <span class="font-medium">Primeira parcela:</span> {{ inst.first_due_date }}
+                    </div>
+
+                    <!-- Ações -->
+                    <div class="flex gap-2">
+                        <a href="{{ url_for('installment_details', installment_id=inst.id) }}" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg text-center font-medium transition duration-200">
+                            Ver Cronograma
+                        </a>
+                        {% if inst.current_status == 'active' %}
+                        <button onclick="payAll('{{ inst.id }}', '{{ inst.description }}')" class="bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg font-medium transition duration-200">
+                            Pagar Todas
+                        </button>
+                        <button onclick="cancelInstallment('{{ inst.id }}', '{{ inst.description }}')" class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg font-medium transition duration-200">
+                            Cancelar
+                        </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-12 text-center">
+            <div class="text-6xl mb-4">💳</div>
+            <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">Nenhum parcelamento encontrado</h3>
+            <p class="text-gray-600 dark:text-gray-400 mb-6">Crie seu primeiro parcelamento para começar a acompanhar suas compras divididas</p>
+            <button onclick="openCreateModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold inline-flex items-center gap-2">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                </svg>
+                Criar Parcelamento
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal: Criar Parcelamento -->
+<div id="createModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-blue-700 p-6 text-white rounded-t-lg">
+            <h2 class="text-2xl font-bold">💳 Novo Parcelamento</h2>
+            <p class="text-blue-100 mt-1">Divida uma compra em várias parcelas</p>
+        </div>
+
+        <!-- Form -->
+        <form action="{{ url_for('create_installment_web') }}" method="POST" class="p-6">
+            <!-- Descrição -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Descrição *
+                </label>
+                <input type="text" name="description" required 
+                       placeholder="Ex: Notebook Dell Inspiron 15"
+                       class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+            </div>
+
+            <!-- Valor Total e Parcelas -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Valor Total (R$) *
+                    </label>
+                    <input type="number" name="total_amount" step="0.01" min="0.01" required 
+                           placeholder="3000.00" id="totalAmount"
+                           oninput="calculateInstallment()"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Número de Parcelas *
+                    </label>
+                    <input type="number" name="installment_count" min="2" max="120" required 
+                           placeholder="10" id="installmentCount"
+                           oninput="calculateInstallment()"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                </div>
+            </div>
+
+            <!-- Juros e Data -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Taxa de Juros (% a.m.)
+                    </label>
+                    <input type="number" name="interest_rate" step="0.1" min="0" value="0" 
+                           placeholder="0" id="interestRate"
+                           oninput="calculateInstallment()"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Primeira Parcela *
+                    </label>
+                    <input type="date" name="first_due_date" required 
+                           value="{{ (now + timedelta(days=30)).strftime('%Y-%m-%d') }}"
+                           class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                </div>
+            </div>
+
+            <!-- Conta e Cartão -->
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Conta
+                    </label>
+                    <select name="account_id" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        <option value="">Selecione...</option>
+                        {% for account in accounts %}
+                        <option value="{{ account.id }}">{{ account.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Cartão
+                    </label>
+                    <select name="card_id" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        <option value="">Selecione...</option>
+                        {% for card in cards %}
+                        <option value="{{ card.id }}">{{ card.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <!-- Categoria -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Categoria
+                </label>
+                <select name="category_id" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                    <option value="">Selecione...</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}">{{ cat.icon }} {{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Preview -->
+            <div id="installmentPreview" class="bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-6 hidden">
+                <h3 class="text-sm font-semibold text-blue-800 dark:text-blue-300 mb-2">📊 Preview</h3>
+                <p class="text-lg font-bold text-blue-900 dark:text-blue-200" id="previewText"></p>
+            </div>
+
+            <!-- Botões -->
+            <div class="flex gap-3">
+                <button type="button" onclick="closeCreateModal()" 
+                        class="flex-1 bg-gray-300 dark:bg-gray-700 hover:bg-gray-400 dark:hover:bg-gray-600 text-gray-800 dark:text-white py-3 px-6 rounded-lg font-semibold transition duration-200">
+                    Cancelar
+                </button>
+                <button type="submit" 
+                        class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-lg font-semibold transition duration-200">
+                    Criar Parcelamento
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+function openCreateModal() {
+    document.getElementById('createModal').classList.remove('hidden');
+    document.getElementById('createModal').classList.add('flex');
+}
+
+function closeCreateModal() {
+    document.getElementById('createModal').classList.add('hidden');
+    document.getElementById('createModal').classList.remove('flex');
+}
+
+function calculateInstallment() {
+    const total = parseFloat(document.getElementById('totalAmount').value) || 0;
+    const count = parseInt(document.getElementById('installmentCount').value) || 0;
+    const rate = parseFloat(document.getElementById('interestRate').value) || 0;
+    
+    if (total > 0 && count >= 2) {
+        let installmentValue;
+        if (rate > 0) {
+            const totalWithInterest = total * (1 + (rate / 100) * count);
+            installmentValue = totalWithInterest / count;
+        } else {
+            installmentValue = total / count;
+        }
+        
+        const preview = document.getElementById('installmentPreview');
+        const previewText = document.getElementById('previewText');
+        
+        previewText.textContent = `${count}x de R$ ${installmentValue.toFixed(2)}`;
+        if (rate > 0) {
+            const totalWithInterest = installmentValue * count;
+            previewText.textContent += ` (Total: R$ ${totalWithInterest.toFixed(2)})`;
+        }
+        
+        preview.classList.remove('hidden');
+    } else {
+        document.getElementById('installmentPreview').classList.add('hidden');
+    }
+}
+
+function filterByStatus(status) {
+    window.location.href = `{{ url_for('installments_page') }}?status=${status}`;
+}
+
+async function payAll(installmentId, description) {
+    if (!confirm(`Deseja pagar todas as parcelas pendentes de "${description}"?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/installments/${installmentId}/pay-all`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.error || 'Falha ao pagar parcelas'));
+        }
+    } catch (error) {
+        alert('Erro ao processar requisição: ' + error.message);
+    }
+}
+
+async function cancelInstallment(installmentId, description) {
+    if (!confirm(`Deseja cancelar o parcelamento "${description}"?\n\nParcelas pendentes serão deletadas. Parcelas já pagas serão mantidas.`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/installments/${installmentId}`, {
+            method: 'DELETE'
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert('Erro: ' + (data.error || 'Falha ao cancelar parcelamento'));
+        }
+    } catch (error) {
+        alert('Erro ao processar requisição: ' + error.message);
+    }
+}
+
+// Fechar modal ao clicar fora
+document.getElementById('createModal').addEventListener('click', function(e) {
+    if (e.target === this) {
+        closeCreateModal();
+    }
+});
+</script>
+{% endblock %}
