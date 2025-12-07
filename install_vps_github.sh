@@ -15,7 +15,7 @@ echo "╚═══════════════════════�
 echo ""
 
 # ⚠️ CONFIGURE AQUI SEU REPOSITÓRIO GITHUB
-GITHUB_REPO="https://github.com/SEU_USUARIO/nik0finance.git"  # ⬅️ ALTERE AQUI!
+GITHUB_REPO="https://github.com/brayan50203/bwsfinance.git"  # ⬅️ URL DO SEU REPOSITÓRIO
 
 echo "📦 Atualizando sistema..."
 apt update -y && apt upgrade -y
